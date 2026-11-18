@@ -1,23 +1,13 @@
-import { clerkPlugin } from "@clerk/fastify";
-import fastifyCors from "@fastify/cors";
-import { OpenAPIHandler } from "@orpc/openapi/fastify";
+import { OpenAPIHandler } from "@orpc/openapi/fetch";
 import { OpenAPIReferencePlugin } from "@orpc/openapi/plugins";
 import { onError } from "@orpc/server";
-import { RPCHandler } from "@orpc/server/fastify";
+import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@reelory/api/routers/index";
-import Fastify from "fastify";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
 
 import { createContext } from "./context";
-import { ENV } from "./env.server";
-
-const baseCorsConfig = {
-  origin: ENV.CORS_ORIGIN,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  credentials: true,
-  maxAge: 86400,
-};
 
 const rpcHandler = new RPCHandler(appRouter, {
   interceptors: [
@@ -28,65 +18,46 @@ const rpcHandler = new RPCHandler(appRouter, {
 });
 
 const apiHandler = new OpenAPIHandler(appRouter, {
-  plugins: [
-    new OpenAPIReferencePlugin({
-      schemaConverters: [new ZodToJsonSchemaConverter()],
-    }),
-  ],
   interceptors: [
     onError((error) => {
       console.error(error);
     }),
   ],
+  plugins: [
+    new OpenAPIReferencePlugin({
+      schemaConverters: [new ZodToJsonSchemaConverter()],
+    }),
+  ],
 });
 
-const fastify = Fastify({
-  logger: true,
-});
+const app = new Hono<{ Bindings: Env }>();
 
-fastify.register(fastifyCors, baseCorsConfig);
-fastify.register(clerkPlugin, {
-  publishableKey: ENV.CLERK_PUBLISHABLE_KEY,
-  secretKey: ENV.CLERK_SECRET_KEY,
-});
+app.use("*", (c, next) =>
+  cors({
+    allowHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    maxAge: 86400,
+    origin: c.env.CORS_ORIGIN,
+  })(c, next)
+);
 
-fastify.register(async (rpcApp) => {
-  // Fully utilize oRPC features by letting oRPC parse the request body.
-  rpcApp.addContentTypeParser("*", (_, _payload, done) => {
-    done(null, undefined);
+app.get("/", (c) => c.text("OK"));
+
+app.all("/rpc/*", async (c) => {
+  const { matched, response } = await rpcHandler.handle(c.req.raw, {
+    context: await createContext(c.req.raw, c.env),
+    prefix: "/rpc",
   });
+  return matched ? c.newResponse(response.body, response) : c.notFound();
+});
 
-  rpcApp.all("/rpc/*", async (request, reply) => {
-    const { matched } = await rpcHandler.handle(request, reply, {
-      context: await createContext(request),
-      prefix: "/rpc",
-    });
-
-    if (!matched) {
-      reply.status(404).send();
-    }
+app.all("/api-reference/*", async (c) => {
+  const { matched, response } = await apiHandler.handle(c.req.raw, {
+    context: await createContext(c.req.raw, c.env),
+    prefix: "/api-reference",
   });
-
-  rpcApp.all("/api-reference/*", async (request, reply) => {
-    const { matched } = await apiHandler.handle(request, reply, {
-      context: await createContext(request),
-      prefix: "/api-reference",
-    });
-
-    if (!matched) {
-      reply.status(404).send();
-    }
-  });
+  return matched ? c.newResponse(response.body, response) : c.notFound();
 });
 
-fastify.get("/", async () => {
-  return "OK";
-});
-
-fastify.listen({ port: 3000 }, (err) => {
-  if (err) {
-    fastify.log.error(err);
-    process.exit(1);
-  }
-  console.log("Server running on port 3000");
-});
+export default app;

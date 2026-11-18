@@ -3,29 +3,27 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsc -b ../../packages/api && tsdown",
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
     "check-types": "tsc -b ../../packages/api && tsc --noEmit",
-    "compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server",
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run dist/index.mjs",
+    "deploy": "wrangler deploy",
     "env:generate": "varlock codegen"
   },
   "dependencies": {
-    "@clerk/fastify": "^3.1.98",
-    "@fastify/cors": "^11.4.1",
+    "@clerk/backend": "^3.30.0",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
     "@reelory/api": "workspace:*",
     "@reelory/db": "workspace:*",
-    "fastify": "^5.12.8",
+    "hono": "^4.13.19",
     "varlock": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261118.1",
     "@reelory/config": "workspace:*",
-    "@types/bun": "catalog:",
-    "tsdown": "^0.23.7",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "wrangler": "^4.164.0"
   }
 }

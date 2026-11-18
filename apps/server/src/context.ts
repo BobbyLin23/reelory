@@ -1,20 +1,23 @@
+import { createClerkClient } from "@clerk/backend";
 import type { Context as ApiContext } from "@reelory/api/context";
+import { createDb } from "@reelory/db";
 
-import { db } from "./services";
-type ClerkContextAuth = ApiContext["auth"];
+export async function createContext(
+  request: Request,
+  env: Env
+): Promise<ApiContext> {
+  const clerk = createClerkClient({
+    publishableKey: env.CLERK_PUBLISHABLE_KEY,
+    secretKey: env.CLERK_SECRET_KEY,
+  });
+  const requestState = await clerk.authenticateRequest(request, {
+    publishableKey: env.CLERK_PUBLISHABLE_KEY,
+    secretKey: env.CLERK_SECRET_KEY,
+  });
+  const { userId } = requestState.toAuth() ?? {};
 
-function toClerkContextAuth(auth: ClerkContextAuth): ClerkContextAuth {
-  return auth ? { userId: auth.userId } : null;
-}
-
-import { getAuth } from "@clerk/fastify";
-
-export async function createContext(req: Parameters<typeof getAuth>[0]): Promise<ApiContext> {
-  const clerkAuth = toClerkContextAuth(getAuth(req));
   return {
-    db,
-    auth: clerkAuth,
+    auth: userId ? { userId } : null,
+    db: createDb(env.DB),
   };
 }
-
-export type Context = Awaited<ReturnType<typeof createContext>>;

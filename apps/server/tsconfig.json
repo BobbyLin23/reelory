@@ -3,9 +3,9 @@
   "references": [{ "path": "../../packages/api" }],
   "compilerOptions": {
     "noEmit": true,
+    "types": ["@cloudflare/workers-types"],
     "paths": {
       "@/*": ["./src/*"]
-    },
-    "jsx": "react-jsx"
+    }
   }
 }

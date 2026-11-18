@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reelory-server",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "reelory",
+      "database_id": "75d95b60-cc8e-4161-b3e8-d38e40116b72",
+      "migrations_dir": "../../packages/db/src/migrations",
+    },
+  ],
+}

@@ -10,7 +10,7 @@
     "check-types": "tsc -b"
   },
   "dependencies": {
-    "@clerk/backend": "^3.27.0",
+    "@clerk/backend": "^3.30.0",
     "@orpc/client": "catalog:",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
