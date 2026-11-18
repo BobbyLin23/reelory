@@ -1,0 +1,89 @@
+{
+  "version": 2,
+  "skills": {
+    "clerk": {
+      "source": "clerk/skills",
+      "commit": "164bf065db0d40becf583bf03c787c4775d17885",
+      "sourceType": "github",
+      "skillPath": "skills/clerk/SKILL.md",
+      "computedHash": "2ac947ca5a20bd213d649c1c31429c690144539c9642348e20f9314a57cf5691"
+    },
+    "clerk-custom-ui": {
+      "source": "clerk/skills",
+      "commit": "164bf065db0d40becf583bf03c787c4775d17885",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-custom-ui/SKILL.md",
+      "computedHash": "03296c405eb47cea2896d34f2160d18e9abd4694090b01c6428e97d9e4dd6165"
+    },
+    "clerk-orgs": {
+      "source": "clerk/skills",
+      "commit": "164bf065db0d40becf583bf03c787c4775d17885",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-orgs/SKILL.md",
+      "computedHash": "a850fc9d7eae6d0a8d6e5f552604970991107ab514fbeed2195632bea7c3139c"
+    },
+    "clerk-react-router-patterns": {
+      "source": "clerk/skills",
+      "commit": "164bf065db0d40becf583bf03c787c4775d17885",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-react-router-patterns/SKILL.md",
+      "computedHash": "45a96d2aaff6bb9bd268a9842dafcb1a6ab5e82b14fc2082840d392a51ad620d"
+    },
+    "clerk-setup": {
+      "source": "clerk/skills",
+      "commit": "164bf065db0d40becf583bf03c787c4775d17885",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-setup/SKILL.md",
+      "computedHash": "e51760c42bda041a237b5f5a420ef74204ca3174c68797235efbd493e770363d"
+    },
+    "clerk-testing": {
+      "source": "clerk/skills",
+      "commit": "164bf065db0d40becf583bf03c787c4775d17885",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-testing/SKILL.md",
+      "computedHash": "f1eb34182c114b18d16f66117f8ad0eba9a1ed3c226b984c6a82ff09c8c02fef"
+    },
+    "clerk-webhooks": {
+      "source": "clerk/skills",
+      "commit": "164bf065db0d40becf583bf03c787c4775d17885",
+      "sourceType": "github",
+      "skillPath": "skills/clerk-webhooks/SKILL.md",
+      "computedHash": "b50cef6155462607f633da76c99f761a80eeae52819c6ba0b4ce0293561f165f"
+    },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "commit": "968d8cb9dc42ae5d52e8fd356cf84596ec832a26",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "388962d16c7a4f13aaeee0d8f128e50a87df8553d42ef7988c39c0e1c74a40e8"
+    },
+    "ultracite": {
+      "source": "haydenbleasel/ultracite",
+      "commit": "60a164713b69595d6f71f84925abbc00a9d81a0f",
+      "sourceType": "github",
+      "skillPath": "skills/ultracite/SKILL.md",
+      "computedHash": "297971f28156faea19bcbbecbf19aeacef02cad83ad7dab1fde57b59b386aace"
+    },
+    "vercel-composition-patterns": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "sourceType": "github",
+      "skillPath": "skills/composition-patterns/SKILL.md",
+      "computedHash": "f711ed8b16162eaa712abbcdbbae6c926f86c57e60127735fecc3ad0dd85b3fa"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "7991ed4fbecdac23f47c1a40c243e00a212a9e7f3604db93959b3ae11dffe299"
+    },
+    "web-design-guidelines": {
+      "source": "vercel-labs/agent-skills",
+      "commit": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "sourceType": "github",
+      "skillPath": "skills/web-design-guidelines/SKILL.md",
+      "computedHash": "4f68ae07187fb0d1fb78c88b503d089da4cf5a9d9625d1f2e425b1590bf96d92"
+    }
+  }
+}

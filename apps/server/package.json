@@ -1,0 +1,32 @@
+{
+  "name": "server",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc -b ../../packages/api && tsdown",
+    "check-types": "tsc -b ../../packages/api && tsc --noEmit",
+    "compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server",
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run dist/index.mjs",
+    "env:generate": "varlock codegen"
+  },
+  "dependencies": {
+    "@clerk/fastify": "^3.1.98",
+    "@fastify/cors": "^11.4.1",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/zod": "catalog:",
+    "@reelory/api": "workspace:*",
+    "@reelory/db": "workspace:*",
+    "fastify": "^5.12.8",
+    "libsql": "catalog:",
+    "varlock": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@reelory/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "tsdown": "^0.23.7",
+    "typescript": "catalog:"
+  }
+}

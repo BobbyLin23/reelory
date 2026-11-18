@@ -1,0 +1,3 @@
+{
+  "extends": "@reelory/config/tsconfig.base.json"
+}
