@@ -19,7 +19,6 @@
     "@reelory/api": "workspace:*",
     "@reelory/db": "workspace:*",
     "fastify": "^5.12.8",
-    "libsql": "catalog:",
     "varlock": "catalog:",
     "zod": "catalog:"
   },
