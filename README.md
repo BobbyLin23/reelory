@@ -46,6 +46,7 @@ bun run db:push
 - Set `CLERK_SECRET_KEY` in `apps/web/.env` for Clerk server middleware
 - Set `CLERK_SECRET_KEY` in `apps/server/.env` for server-side Clerk auth
 - Set `CLERK_PUBLISHABLE_KEY` in `apps/server/.env` for Clerk backend middleware
+- Set `VITE_SERVER_URL=http://localhost:3058` in `apps/web/.env` so the web app talks to the local server
 
 Then, run the development server:
 
@@ -53,8 +54,7 @@ Then, run the development server:
 bun run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:5173](http://localhost:5173) in your browser to see the web application. The API is running at [http://localhost:3058](http://localhost:3058).
 
 ## UI Customization
 

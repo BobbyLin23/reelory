@@ -5,6 +5,7 @@
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  "dev": { "port": 3058 },
   "d1_databases": [
     {
       "binding": "DB",
