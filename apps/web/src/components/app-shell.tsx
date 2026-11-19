@@ -1,12 +1,5 @@
 import { useClerk, useUser } from "@clerk/react-router";
-import {
-  ChartNoAxesColumn,
-  Compass,
-  House,
-  LayoutDashboard,
-  ListVideo,
-  Settings,
-} from "lucide-react";
+import { ChartNoAxesColumn, Compass, House, ListVideo, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
@@ -105,11 +98,6 @@ function AccountControls() {
       theme={themePreference}
       onThemeChange={setTheme}
       items={[
-        {
-          label: "Dashboard",
-          icon: <LayoutDashboard aria-hidden="true" size={16} strokeWidth={1.75} />,
-          onSelect: () => navigate("/dashboard"),
-        },
         {
           label: "Settings",
           icon: <Settings aria-hidden="true" size={16} strokeWidth={1.75} />,

@@ -16,8 +16,8 @@ const SignInPage = () => (
       routing="path"
       path="/sign-in"
       signUpUrl="/sign-up"
-      fallbackRedirectUrl="/dashboard"
-      signUpFallbackRedirectUrl="/dashboard"
+      fallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
       appearance={clerkAppearance}
     />
   </AuthPage>
