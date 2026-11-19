@@ -43,6 +43,9 @@ lerna-debug.log*
 .turbo
 .nx
 
+# Amp orb portals
+.amp/portals/*
+
 # Better-T-Stack
 .alchemy
 .vercel

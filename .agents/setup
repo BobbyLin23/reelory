@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
+bun_version=$(node -p 'require("./package.json").packageManager.match(/^bun@(\d+\.\d+\.\d+)$/)[1]')
+export PATH="$HOME/.local/bin:$PATH"
+
+if [[ "$(bun --version 2>/dev/null || true)" != "$bun_version" ]]; then
+  printf 'Installing Bun %s\n' "$bun_version"
+  time npm install --global --prefix "$HOME/.local" --no-audit --no-fund "bun@$bun_version"
+  hash -r
+fi
+printf 'Using Bun %s and Node %s\n' "$(bun --version)" "$(node --version)"
+
+printf 'Installing workspace dependencies and generating Varlock types\n'
+time bun install --frozen-lockfile

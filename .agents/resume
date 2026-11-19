@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Amp restores dependencies from the snapshot; there are no services to reconnect.
