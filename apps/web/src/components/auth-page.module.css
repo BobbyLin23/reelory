@@ -94,7 +94,7 @@
   min-height: var(--control-height-md);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  background-color: var(--surface);
+  background-color: var(--surface-muted);
   box-shadow: none;
   outline: none;
   transition: border-color var(--duration-fast) var(--ease-standard);
@@ -107,6 +107,7 @@
 .card :global(input.cl-formFieldInput:focus),
 .card :global(.cl-otpCodeFieldInput.cl-input:focus-within) {
   border-color: var(--foreground);
+  box-shadow: none;
 }
 
 .card :global(input.cl-formFieldInput[aria-invalid="true"]) {

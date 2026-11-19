@@ -65,7 +65,7 @@ export const clerkAppearance = {
       fontSize: "var(--text-sm)",
     },
     otpCodeFieldInput: {
-      backgroundColor: "var(--surface)",
+      backgroundColor: "var(--surface-muted)",
       borderRadius: "var(--radius-control)",
       color: "var(--foreground)",
       fontSize: "var(--text-xl)",
@@ -86,7 +86,7 @@ export const clerkAppearance = {
     colorBorder: "var(--border)",
     colorDanger: "var(--danger)",
     colorForeground: "var(--foreground)",
-    colorInput: "var(--surface)",
+    colorInput: "var(--surface-muted)",
     colorInputForeground: "var(--foreground)",
     colorMuted: "var(--surface-muted)",
     colorMutedForeground: "var(--text-secondary)",
