@@ -1,0 +1,105 @@
+/** Clerk themes colours and type well through variables; the field and button boxes are sized in the page stylesheet. */
+export const clerkAppearance = {
+  elements: {
+    alert: {
+      backgroundColor: "var(--surface-muted)",
+      borderRadius: "var(--radius-control)",
+      color: "var(--foreground)",
+    },
+    alertText: { fontSize: "var(--text-sm)" },
+    card: {
+      backgroundColor: "transparent",
+      border: "none",
+      borderRadius: 0,
+      boxShadow: "none",
+      maxWidth: "none",
+      padding: 0,
+      width: "100%",
+    },
+    cardBox: { width: "100%" },
+    dividerLine: { backgroundColor: "var(--border)" },
+    dividerText: {
+      color: "var(--text-muted)",
+      fontSize: "var(--text-xs)",
+    },
+    footer: {
+      backgroundColor: "transparent",
+      borderTop: "1px solid var(--border-subtle)",
+    },
+    footerActionLink: {
+      color: "var(--foreground)",
+      fontSize: "var(--text-sm)",
+      fontWeight: 500,
+    },
+    footerActionText: {
+      color: "var(--text-secondary)",
+      fontSize: "var(--text-sm)",
+    },
+    footerPagesLink: {
+      color: "var(--text-muted)",
+      fontSize: "var(--text-xs)",
+    },
+    formButtonPrimary: {
+      borderRadius: "var(--radius-control)",
+      color: "var(--background)",
+      fontSize: "var(--text-sm)",
+      fontWeight: 500,
+    },
+    formFieldErrorText: {
+      color: "var(--danger)",
+      fontSize: "var(--text-sm)",
+    },
+    formFieldInput: {
+      borderRadius: "var(--radius-control)",
+      color: "var(--foreground)",
+      fontSize: "var(--text-field)",
+    },
+    formFieldLabel: {
+      color: "var(--text-secondary)",
+      fontSize: "var(--text-sm)",
+      fontWeight: 500,
+    },
+    identityPreviewEditButton: { color: "var(--text-secondary)" },
+    identityPreviewText: {
+      color: "var(--foreground)",
+      fontSize: "var(--text-sm)",
+    },
+    otpCodeFieldInput: {
+      backgroundColor: "var(--surface)",
+      borderRadius: "var(--radius-control)",
+      color: "var(--foreground)",
+      fontSize: "var(--text-xl)",
+    },
+    rootBox: { width: "100%" },
+    socialButtonsBlockButton: {
+      borderRadius: "var(--radius-control)",
+      color: "var(--foreground)",
+    },
+    socialButtonsBlockButtonText: {
+      fontSize: "var(--text-sm)",
+      fontWeight: 500,
+    },
+  },
+  variables: {
+    borderRadius: "var(--radius-control)",
+    colorBackground: "transparent",
+    colorBorder: "var(--border)",
+    colorDanger: "var(--danger)",
+    colorForeground: "var(--foreground)",
+    colorInput: "var(--surface)",
+    colorInputForeground: "var(--foreground)",
+    colorMuted: "var(--surface-muted)",
+    colorMutedForeground: "var(--text-secondary)",
+    colorNeutral: "var(--foreground)",
+    colorPrimary: "var(--foreground)",
+    colorPrimaryForeground: "var(--background)",
+    colorRing: "var(--accent-subtle)",
+    colorShadow: "transparent",
+    colorSuccess: "var(--success)",
+    colorWarning: "var(--warning)",
+    fontFamily: "var(--font-body)",
+    fontFamilyButtons: "var(--font-body)",
+    fontSize: "var(--text-sm)",
+    fontWeight: { bold: 500, medium: 500, normal: 400, semibold: 500 },
+  },
+};

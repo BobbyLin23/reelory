@@ -1,24 +1,26 @@
 import { SignIn } from "@clerk/react-router";
-import { Link } from "react-router";
 
-import styles from "@/components/sign-in-page.module.css";
+import { AuthPage } from "@/components/auth-page";
+import { normalizeAuthRedirect } from "@/utils/auth-redirect";
+import { clerkAppearance } from "@/utils/clerk-appearance";
+
+import type { Route } from "./+types/sign-in.$";
+
+export const loader = ({ request }: Route.LoaderArgs) => normalizeAuthRedirect(request);
 
 export const meta = () => [{ title: "Sign in · reelory" }];
 
 const SignInPage = () => (
-  <main className={styles.page}>
-    <div className={styles.panel}>
-      <Link className={styles.brand} to="/">
-        reelory
-      </Link>
-      <SignIn
-        routing="path"
-        path="/sign-in"
-        fallbackRedirectUrl="/dashboard"
-        signUpFallbackRedirectUrl="/dashboard"
-      />
-    </div>
-  </main>
+  <AuthPage title="Sign in" description="Continue to your lists, stats, and saved films.">
+    <SignIn
+      routing="path"
+      path="/sign-in"
+      signUpUrl="/sign-up"
+      fallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/dashboard"
+      appearance={clerkAppearance}
+    />
+  </AuthPage>
 );
 
 export default SignInPage;

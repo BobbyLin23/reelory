@@ -1,0 +1,199 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-height: 100svh;
+  grid-template-rows: 3.5rem minmax(0, 1fr);
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+  letter-spacing: var(--tracking-body);
+}
+
+/* Quiet rings behind the card: lines only, faded into the canvas at the edges. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 45%, #000 30%, transparent 100%);
+}
+
+.rings {
+  width: 100%;
+  height: 100%;
+}
+
+.ring {
+  fill: none;
+  stroke: var(--border-subtle);
+  stroke-width: 1;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-inline: clamp(16px, 4vw, 32px);
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: var(--tracking-display);
+  line-height: 1;
+}
+
+.stage {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: var(--space-4) clamp(16px, 4vw, 32px) var(--space-16);
+}
+
+.card {
+  display: grid;
+  width: min(100%, 26rem);
+  gap: var(--space-6);
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+}
+
+.heading {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 400;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-display);
+  text-wrap: balance;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  text-wrap: pretty;
+}
+
+/* Clerk draws its fields and buttons with single-class rules, so these scoped rules give them Arc's box metrics. */
+.card :global(input.cl-formFieldInput),
+.card :global(.cl-otpCodeFieldInput.cl-input) {
+  min-height: var(--control-height-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background-color: var(--surface);
+  box-shadow: none;
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.card :global(input.cl-formFieldInput::placeholder) {
+  color: var(--text-muted);
+}
+
+.card :global(input.cl-formFieldInput:focus),
+.card :global(.cl-otpCodeFieldInput.cl-input:focus-within) {
+  border-color: var(--foreground);
+}
+
+.card :global(input.cl-formFieldInput[aria-invalid="true"]) {
+  border-color: var(--danger);
+}
+
+.card :global(.cl-formButtonPrimary) {
+  min-height: var(--control-height-md);
+  border: 0;
+  border-radius: var(--radius-control);
+  background-color: var(--foreground);
+  color: var(--background);
+  box-shadow: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.card :global(.cl-formButtonPrimary:disabled) {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.card :global(.cl-socialButtonsBlockButton) {
+  min-height: var(--control-height-md);
+  border: 0;
+  border-radius: var(--radius-control);
+  background-color: var(--surface-muted);
+  color: var(--foreground);
+  box-shadow: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+/* The first step carries the page heading; later steps (password, code) lend Clerk's own header, so only one h1 shows. */
+.card:not(:has(:global(.cl-signIn-start))):not(:has(:global(.cl-signUp-start))) .heading {
+  display: none;
+}
+
+.card :global(.cl-signIn-start .cl-header),
+.card :global(.cl-signUp-start .cl-header) {
+  display: none;
+}
+
+.card :global(.cl-headerTitle) {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 400;
+  letter-spacing: var(--tracking-display);
+  line-height: var(--leading-display);
+  text-wrap: balance;
+}
+
+.card :global(.cl-headerSubtitle) {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+/* Keeps "Don't have an account? Sign up" on one flow when it wraps on narrow phones. */
+.card :global(.cl-footerAction) {
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: var(--space-1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card :global(input.cl-formFieldInput:hover:not(:focus)) {
+    border-color: var(--foreground);
+  }
+
+  .card :global(.cl-formButtonPrimary:hover:not(:disabled)) {
+    opacity: 0.91;
+  }
+
+  .card :global(.cl-socialButtonsBlockButton:hover) {
+    background-color: var(--surface-raised);
+  }
+}
+
+@media (max-width: 479px) {
+  .stage {
+    align-content: start;
+    padding: var(--space-3) var(--space-3) var(--space-10);
+  }
+
+  .card {
+    padding: var(--space-6) var(--space-5);
+    border-radius: var(--radius-panel);
+  }
+}
