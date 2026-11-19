@@ -5,3 +5,10 @@
   --font-inter: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-geist: "Geist", ui-sans-serif, system-ui, sans-serif;
 }
+
+/* The devtools button floats over the shell's bottom tab bar on phones. */
+@media (max-width: 767px) {
+  body .tsqd-open-btn-container {
+    display: none;
+  }
+}

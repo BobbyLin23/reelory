@@ -19,7 +19,6 @@ import {
 import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
 
 import type { Route } from "./+types/root";
-import Header from "./components/header";
 import { ThemeProvider } from "./components/theme-provider";
 import { queryClient } from "./utils/orpc";
 
@@ -79,10 +78,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
           disableTransitionOnChange
           storageKey="vite-ui-theme"
         >
-          <div className="grid grid-rows-[auto_1fr] h-svh">
-            <Header />
-            <Outlet />
-          </div>
+          <Outlet />
           <Toaster richColors />
         </ThemeProvider>
         <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
