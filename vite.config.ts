@@ -11,6 +11,8 @@ export default defineConfig({
       "packages/db/dist/**",
       "packages/api/dist/**",
       "packages/db/local.db*",
+      ".agents/**",
+      ".claude/**",
     ],
     options: {
       typeAware: false,
@@ -27,6 +29,8 @@ export default defineConfig({
       "packages/db/dist/**",
       "packages/api/dist/**",
       "packages/db/local.db*",
+      ".agents/**",
+      ".claude/**",
     ],
     singleQuote: false,
     semi: true,

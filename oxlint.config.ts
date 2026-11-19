@@ -5,5 +5,5 @@ import remix from "ultracite/oxlint/remix";
 
 export default defineConfig({
   extends: [core, react, remix],
-  ignorePatterns: [...(core.ignorePatterns ?? []), ".agents/**"],
+  ignorePatterns: [...(core.ignorePatterns ?? []), ".agents/**", ".claude/**"],
 });
