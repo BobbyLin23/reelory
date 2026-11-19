@@ -124,3 +124,15 @@ Oxlint + Oxfmt will catch most mechanical issues automatically. Focus your atten
 ---
 
 Most formatting and common issues are automatically fixed by Oxlint + Oxfmt. Run `bunx ultracite fix` before committing to ensure compliance.
+
+---
+
+# Arc UI
+
+The web app's interface is built with [Arc](https://uiarc.dev), a CSS modules component library installed through the shadcn registry. The full agent skill is in `.agents/skills/arc/SKILL.md`; read it before building or reviewing UI in `apps/web`.
+
+- Install components from the registry: `bunx shadcn@latest add @uiarc/badge -c apps/web`. They land in `apps/web/src/components/arc/`.
+- Import them from their installed path, for example `import { Button } from "@/components/arc/button/button"`.
+- `foundation.css` is imported once in `apps/web/src/root.tsx`. Build on its semantic tokens (`--background`, `--surface`, `--foreground`, `--text-secondary`, `--border`, `--accent`, `--success`, `--warning`, `--danger`) instead of raw colors or Tailwind color classes.
+- Geist is the display face and Inter the body face, exposed as `--font-geist` and `--font-inter`. `next-themes` writes `data-theme` on `<html>` next to the `.dark` class, so Arc and Tailwind follow the same theme.
+- Never restyle Arc component internals or rebuild Pro items. No eyebrow labels, uppercase transforms, em dashes, hand-made focus rings, or weights above 500.

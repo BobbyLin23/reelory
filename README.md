@@ -82,6 +82,20 @@ import { Button } from "@reelory/ui/components/button";
 
 If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
 
+### Arc UI
+
+The web app builds its interface with [Arc](https://uiarc.dev), a CSS modules component library that shares design tokens through `apps/web/src/components/arc/foundation.css` and installs through the shadcn registry. Components live in `apps/web/src/components/arc/` and read the tokens, so they follow the app's light and dark themes.
+
+```bash
+bunx shadcn@latest add @uiarc/badge -c apps/web
+```
+
+```tsx
+import { Badge } from "@/components/arc/badge/badge";
+```
+
+The Arc agent skill and its rules live in `.agents/skills/arc/`, and `AGENTS.md` records the conventions. The shared shadcn primitives in `packages/ui` still back the app shell.
+
 ## Environment Configuration
 
 Each app owns its environment schema in `.env.schema`. Varlock generates `src/env.ts` during installation; run `bun run env:generate` after changing a schema. Commit schemas, and keep secrets in ignored env files or your deployment platform.

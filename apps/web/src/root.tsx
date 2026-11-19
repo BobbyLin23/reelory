@@ -2,6 +2,7 @@ import { ClerkProvider, useAuth } from "@clerk/react-router";
 import { clerkMiddleware, rootAuthLoader } from "@clerk/react-router/server";
 
 import "./index.css";
+import "@/components/arc/foundation.css";
 import { Toaster } from "@reelory/ui/components/sonner";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
@@ -45,7 +46,7 @@ export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
   },
 ];
 
@@ -73,7 +74,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
       <ClerkApiAuthBridge />
       <QueryClientProvider client={queryClient}>
         <ThemeProvider
-          attribute="class"
+          attribute={["class", "data-theme"]}
           defaultTheme="dark"
           disableTransitionOnChange
           storageKey="vite-ui-theme"
