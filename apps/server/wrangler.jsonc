@@ -6,6 +6,10 @@
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "dev": { "port": 3058 },
+  // KV cache for TMDB responses, keyed with per-endpoint TTLs.
+  "kv_namespaces": [
+    { "binding": "TMDB_CACHE", "id": "2870323fdfb14edaba9d8d18e30a5524" },
+  ],
   "d1_databases": [
     {
       "binding": "DB",

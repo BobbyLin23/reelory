@@ -1,5 +1,6 @@
 import { createClerkClient } from "@clerk/backend";
 import type { Context as ApiContext } from "@reelory/api/context";
+import { createTmdbClient } from "@reelory/api/tmdb/client";
 import { createDb } from "@reelory/db";
 
 export async function createContext(
@@ -19,5 +20,6 @@ export async function createContext(
   return {
     auth: userId ? { userId } : null,
     db: createDb(env.DB),
+    tmdb: createTmdbClient({ apiKey: env.TMDB_API_KEY, cache: env.TMDB_CACHE }),
   };
 }
