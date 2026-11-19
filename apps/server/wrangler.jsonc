@@ -15,7 +15,9 @@
       "binding": "DB",
       "database_name": "reelory",
       "database_id": "75d95b60-cc8e-4161-b3e8-d38e40116b72",
+      // drizzle-kit writes one folder per migration; point Wrangler at the SQL inside.
       "migrations_dir": "../../packages/db/src/migrations",
+      "migrations_pattern": "../../packages/db/src/migrations/*/migration.sql",
     },
   ],
 }
