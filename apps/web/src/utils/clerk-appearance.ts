@@ -24,7 +24,6 @@ export const clerkAppearance = {
     },
     footer: {
       backgroundColor: "transparent",
-      borderTop: "1px solid var(--border-subtle)",
     },
     footerActionLink: {
       color: "var(--foreground)",
@@ -55,7 +54,7 @@ export const clerkAppearance = {
       fontSize: "var(--text-field)",
     },
     formFieldLabel: {
-      color: "var(--text-secondary)",
+      color: "var(--foreground)",
       fontSize: "var(--text-sm)",
       fontWeight: 500,
     },
@@ -65,7 +64,7 @@ export const clerkAppearance = {
       fontSize: "var(--text-sm)",
     },
     otpCodeFieldInput: {
-      backgroundColor: "var(--surface-muted)",
+      backgroundColor: "var(--field-fill)",
       borderRadius: "var(--radius-control)",
       color: "var(--foreground)",
       fontSize: "var(--text-xl)",
@@ -86,7 +85,7 @@ export const clerkAppearance = {
     colorBorder: "var(--border)",
     colorDanger: "var(--danger)",
     colorForeground: "var(--foreground)",
-    colorInput: "var(--surface-muted)",
+    colorInput: "var(--field-fill)",
     colorInputForeground: "var(--foreground)",
     colorMuted: "var(--surface-muted)",
     colorMutedForeground: "var(--text-secondary)",
