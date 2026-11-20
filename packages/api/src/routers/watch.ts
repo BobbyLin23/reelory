@@ -20,6 +20,14 @@ const pairedEpisode = ({ season, episode }: z.infer<typeof watchFields>) =>
 const ownedWatch = (id: string, userId: string) =>
   and(eq(watchEntries.id, id), eq(watchEntries.userId, userId));
 
+const episodeKey = ({ episode, season }: { episode: number; season: number }) =>
+  `${season}:${episode}`;
+
+/** D1 accepts 100 bound parameters per statement, so a full season fills in small inserts. */
+const ROWS_PER_INSERT = 10;
+
+const MAX_EPISODES_PER_REQUEST = 500;
+
 export const watchRouter = {
   delete: protectedProcedure
     .input(z.object({ id: z.uuid() }))
@@ -65,6 +73,73 @@ export const watchRouter = {
         .returning()
         .get(),
     ),
+
+  // Bulk marking fills the gap between what a user has watched and the episode they
+  // pick. The caller resolves the range from TMDB's cached season data; this writes
+  // one row per missing episode and skips any episode already recorded, so asking
+  // twice never duplicates rows.
+  markThrough: protectedProcedure
+    .input(
+      titleKey
+        .extend({
+          episodes: z
+            .array(
+              z.object({
+                episode: z.int().positive(),
+                season: z.int().nonnegative(),
+              }),
+            )
+            .min(1)
+            .max(MAX_EPISODES_PER_REQUEST),
+          watchedOn: z.iso.date().nullish(),
+        })
+        .refine(({ mediaType }) => mediaType === "tv", {
+          message: "Only series have episodes to mark through.",
+        }),
+    )
+    .handler(async ({ context, input }) => {
+      const existing = await context.db
+        .select({ episode: watchEntries.episode, season: watchEntries.season })
+        .from(watchEntries)
+        .where(
+          and(
+            eq(watchEntries.userId, context.auth.userId),
+            eq(watchEntries.tmdbId, input.tmdbId),
+            eq(watchEntries.mediaType, input.mediaType),
+          ),
+        );
+      const recorded = new Set(
+        existing.flatMap(({ episode, season }) =>
+          season === null || episode === null ? [] : [episodeKey({ episode, season })],
+        ),
+      );
+      const requested = new Map(
+        input.episodes.map((episode) => [episodeKey(episode), episode] as const),
+      );
+      const missing = [...requested.values()].filter(
+        (episode) => !recorded.has(episodeKey(episode)),
+      );
+
+      let created = 0;
+      for (let index = 0; index < missing.length; index += ROWS_PER_INSERT) {
+        const rows = await context.db
+          .insert(watchEntries)
+          .values(
+            missing.slice(index, index + ROWS_PER_INSERT).map(({ episode, season }) => ({
+              episode,
+              mediaType: input.mediaType,
+              season,
+              userId: context.auth.userId,
+              tmdbId: input.tmdbId,
+              watchedOn: input.watchedOn ?? null,
+            })),
+          )
+          .returning({ id: watchEntries.id });
+        created += rows.length;
+      }
+
+      return { created, skipped: requested.size - created };
+    }),
 
   update: protectedProcedure
     .input(

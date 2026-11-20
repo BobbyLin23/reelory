@@ -74,21 +74,30 @@ export const libraryRouter = {
 
     const summaries = new Map<
       string,
-      { latest: WatchSummary | null; progress: { episode: number; season: number } | null }
+      {
+        episodes: Set<string>;
+        latest: WatchSummary | null;
+        progress: { episode: number; season: number } | null;
+      }
     >();
     for (const watch of watches) {
       const key = `${watch.mediaType}:${watch.tmdbId}`;
-      const summary = summaries.get(key) ?? { latest: null, progress: null };
+      const summary = summaries.get(key) ?? {
+        episodes: new Set<string>(),
+        latest: null,
+        progress: null,
+      };
       if (summary.latest === null || compareWatches(watch, summary.latest) > 0) {
         summary.latest = watch;
       }
-      if (
-        watch.season !== null &&
-        watch.episode !== null &&
-        (summary.progress === null ||
-          isFurtherEpisode({ episode: watch.episode, season: watch.season }, summary.progress))
-      ) {
-        summary.progress = { episode: watch.episode, season: watch.season };
+      if (watch.season !== null && watch.episode !== null) {
+        summary.episodes.add(`${watch.season}:${watch.episode}`);
+        if (
+          summary.progress === null ||
+          isFurtherEpisode({ episode: watch.episode, season: watch.season }, summary.progress)
+        ) {
+          summary.progress = { episode: watch.episode, season: watch.season };
+        }
       }
       summaries.set(key, summary);
     }
@@ -108,7 +117,10 @@ export const libraryRouter = {
             summary?.latest === null || summary?.latest === undefined
               ? null
               : { rating: summary.latest.rating, watchedOn: summary.latest.watchedOn },
-          progress: summary?.progress ?? null,
+          progress:
+            summary?.progress === null || summary?.progress === undefined
+              ? null
+              : { ...summary.progress, watchedEpisodes: summary.episodes.size },
         };
       }),
     };

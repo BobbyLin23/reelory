@@ -72,6 +72,7 @@ test("rejects unauthenticated requests to every new procedure", async () => {
     anonymous.library.setStatus({ ...tv, snapshot, status: "watching" }),
     anonymous.watch.list(tv),
     anonymous.watch.log(tv),
+    anonymous.watch.markThrough({ ...tv, episodes: [{ episode: 1, season: 1 }] }),
     anonymous.watch.update({ id, review: "Private" }),
     anonymous.watch.delete({ id }),
   ];
@@ -133,6 +134,8 @@ test("summarizes counts, the latest watch, and the furthest episode per title", 
   await alice.watch.log({ ...series, episode: 1, rating: 8, season: 2, watchedOn: "2026-11-10" });
   // A backfilled earlier episode is the furthest progress even though a later watch holds the date.
   await alice.watch.log({ ...series, episode: 4, rating: 4, season: 1, watchedOn: "2026-11-05" });
+  // A rewatch of an episode already recorded does not count twice toward the bar.
+  await alice.watch.log({ ...series, episode: 4, rating: 1, season: 1, watchedOn: "2026-10-01" });
   await alice.watch.log({ ...film, rating: 9, watchedOn: null });
   await bob.watch.log({ ...series, episode: 9, season: 9 });
 
@@ -144,7 +147,7 @@ test("summarizes counts, the latest watch, and the furthest episode per title", 
   const byTitle = new Map(overview.entries.map((entry) => [entry.title, entry]));
   expect(byTitle.get("Series")).toMatchObject({
     latestWatch: { rating: 8, watchedOn: "2026-11-10" },
-    progress: { episode: 1, season: 2 },
+    progress: { episode: 1, season: 2, watchedEpisodes: 3 },
   });
   expect(byTitle.get("Film")).toMatchObject({
     latestWatch: { rating: 9, watchedOn: null },
@@ -153,7 +156,7 @@ test("summarizes counts, the latest watch, and the furthest episode per title", 
   expect(byTitle.get("Queued")).toMatchObject({ latestWatch: null, progress: null });
   expect(await bob.library.overview()).toMatchObject({
     counts: { want: 1, watched: 0, watching: 0 },
-    entries: [{ progress: { episode: 9, season: 9 } }],
+    entries: [{ progress: { episode: 9, season: 9, watchedEpisodes: 1 } }],
   });
 });
 
@@ -226,6 +229,66 @@ test("logs rewatches independently and lets only the owner edit or delete a watc
   expect(await alice.library.list()).toEqual([libraryEntry]);
 });
 
+test("marks every missing episode through a target in one request", async () => {
+  const alice = rpc("mark-through-alice");
+  const bob = rpc("mark-through-bob");
+  const series = { mediaType: "tv", tmdbId: 77 } as const;
+  const seriesEntry = await alice.library.setStatus({ ...series, snapshot, status: "watching" });
+
+  const first = await alice.watch.markThrough({
+    ...series,
+    episodes: [
+      { episode: 1, season: 1 },
+      { episode: 2, season: 1 },
+      { episode: 2, season: 1 },
+      { episode: 3, season: 1 },
+      { episode: 1, season: 2 },
+    ],
+    watchedOn: "2026-11-18",
+  });
+  expect(first).toEqual({ created: 4, skipped: 0 });
+
+  const second = await alice.watch.markThrough({
+    ...series,
+    episodes: [
+      { episode: 2, season: 1 },
+      { episode: 3, season: 1 },
+      { episode: 4, season: 1 },
+      { episode: 1, season: 2 },
+      { episode: 2, season: 2 },
+    ],
+    watchedOn: "2026-11-19",
+  });
+  expect(second).toEqual({ created: 2, skipped: 3 });
+
+  const watches = await alice.watch.list(series);
+  expect(watches.map(({ episode, season }) => `${season}:${episode}`).toSorted()).toEqual([
+    "1:1",
+    "1:2",
+    "1:3",
+    "1:4",
+    "2:1",
+    "2:2",
+  ]);
+  expect(watches.filter((watch) => watch.watchedOn === "2026-11-18")).toHaveLength(4);
+  expect(watches.filter((watch) => watch.watchedOn === "2026-11-19")).toHaveLength(2);
+  // Filling every episode never infers completion: the user's status is untouched.
+  expect(await alice.library.list(series)).toEqual([seriesEntry]);
+
+  // Marking an out-of-order episode with a single log leaves the earlier ones alone.
+  const outOfOrder = rpc("mark-through-out-of-order");
+  const later = { mediaType: "tv", tmdbId: 78 } as const;
+  await outOfOrder.watch.log({ ...later, episode: 5, season: 2, watchedOn: "2026-11-18" });
+  expect(await outOfOrder.watch.list(later)).toMatchObject([{ episode: 5, season: 2 }]);
+
+  // Another user buffering the same series gets their own rows and does not move Alice's progress.
+  expect(await bob.watch.markThrough({ ...series, episodes: [{ episode: 6, season: 1 }] })).toEqual(
+    { created: 1, skipped: 0 },
+  );
+  expect(await bob.watch.list(series)).toHaveLength(1);
+  expect(await alice.watch.list(series)).toHaveLength(6);
+});
+
 test("rejects invalid status, watch dates, ratings, and inconsistent episode fields", async () => {
   const client = rpc("validation-user");
   const movieWatch = await client.watch.log(movie);
@@ -237,6 +300,19 @@ test("rejects invalid status, watch dates, ratings, and inconsistent episode fie
     client.watch.log({ ...movie, rating: 11 }),
     client.watch.log({ ...movie, episode: 1, season: 0 }),
     client.watch.log({ ...tv, episode: 1 }),
+    client.watch.markThrough({ ...movie, episodes: [{ episode: 1, season: 1 }] }),
+    client.watch.markThrough({ ...tv, episodes: [] }),
+    client.watch.markThrough({ ...tv, episodes: [{ episode: 0, season: 1 }] }),
+    client.watch.markThrough({ ...tv, episodes: [{ episode: 1, season: -1 }] }),
+    client.watch.markThrough({
+      ...tv,
+      episodes: [{ episode: 1, season: 1 }],
+      watchedOn: "2026-13-01",
+    }),
+    client.watch.markThrough({
+      ...tv,
+      episodes: Array.from({ length: 501 }, (_, index) => ({ episode: index + 1, season: 1 })),
+    }),
     client.watch.update({ id: movieWatch.id, rating: 1.5 }),
     client.watch.update({ episode: null, id: movieWatch.id, review: "Half a patch" }),
     client.watch.update({ episode: 1, id: movieWatch.id, season: 0 }),

@@ -7,6 +7,7 @@ import type { LibraryStatus } from "@/utils/media";
 import { LIBRARY_STATUS_ACTIONS, formatVote, libraryStatusLabel } from "@/utils/media";
 
 import { LogSheet } from "./log-sheet";
+import { SeriesProgressSection } from "./series-progress-section";
 import { CastSection, SeasonsSection, WatchesSection } from "./title-sections";
 import { errorCode, useTitlePage } from "./use-title-page";
 
@@ -152,6 +153,14 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
           />
         )}
       </Skeleton>
+      {page.isTv ? (
+        <SeriesProgressSection
+          isPending={page.detailPending || page.watchesPending}
+          seasons={page.seasons}
+          tmdbId={tmdbId}
+          watches={page.watches}
+        />
+      ) : null}
       <CastSection credits={page.credits} isPending={page.creditsPending} />
       {page.isTv ? <SeasonsSection seasons={page.seasons} /> : null}
       <WatchesSection

@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TmdbTvDetail } from "@reelory/api/tmdb/schemas";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
@@ -11,11 +12,14 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import type { Segment } from "@/components/arc/segmented-control/segmented-control";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { PageIntro } from "@/components/page-intro";
-import type { LibraryStatus, MediaType } from "@/utils/media";
+import { SeriesProgress } from "@/components/series-progress/series-progress";
+import type { EpisodePosition, LibraryStatus, MediaType } from "@/utils/media";
 import {
   LIBRARY_STATUS_ACTIONS,
+  formatEpisode,
   formatStars,
   formatWatchDate,
+  nextEpisode,
   tmdbImageUrl,
   toIsoDate,
 } from "@/utils/media";
@@ -28,7 +32,7 @@ interface LibraryItem {
   latestWatch: { rating: number | null; watchedOn: string | null } | null;
   mediaType: MediaType;
   posterPath: string | null;
-  progress: { episode: number; season: number } | null;
+  progress: { episode: number; season: number; watchedEpisodes: number } | null;
   status: LibraryStatus;
   title: string;
   tmdbId: number;
@@ -83,6 +87,16 @@ const saveView = (view: LibraryView) => {
 };
 
 const titlePath = (entry: LibraryItem) => `/title/${entry.mediaType}/${entry.tmdbId}`;
+
+const titleKey = (entry: LibraryItem) => `${entry.mediaType}:${entry.tmdbId}`;
+
+interface RailItem {
+  entry: LibraryItem;
+  /** Undefined while the cached TMDB season data is loading or unavailable. */
+  next: EpisodePosition | null | undefined;
+  seasons: TmdbTvDetail["seasons"] | undefined;
+  seasonsError: boolean;
+}
 
 const Poster = ({
   className,
@@ -165,13 +179,13 @@ const DenseList = ({ entries }: { entries: LibraryItem[] }) => (
 );
 
 const ContinueWatching = ({
-  entries,
+  items,
   onAdvance,
   pendingKey,
   saveError,
 }: {
-  entries: LibraryItem[];
-  onAdvance: (entry: LibraryItem) => void;
+  items: RailItem[];
+  onAdvance: (entry: LibraryItem, next: EpisodePosition) => void;
   pendingKey: string | null;
   saveError: boolean;
 }) => (
@@ -188,35 +202,42 @@ const ContinueWatching = ({
       </p>
     ) : null}
     <ul className={styles.rail}>
-      {entries.map((entry) => {
-        const progress = entry.progress;
-        if (progress === null) {
-          return null;
-        }
-        const next = `S${progress.season}E${progress.episode + 1}`;
-        return (
-          <li className={styles.railItem} key={entry.id}>
-            <Link className={styles.railLink} to={titlePath(entry)}>
-              <Poster className={styles.railPoster} path={entry.posterPath} size="w185" />
-              <span className={styles.railCopy}>
-                <span className={styles.cardTitle}>{entry.title}</span>
-                <span className={styles.railProgress}>
-                  Watched through S{progress.season}E{progress.episode}
-                </span>
-              </span>
-            </Link>
+      {items.map(({ entry, next, seasons, seasonsError }) => (
+        <li className={styles.railItem} key={entry.id}>
+          <Link className={styles.railLink} to={titlePath(entry)}>
+            <Poster className={styles.railPoster} path={entry.posterPath} size="w185" />
+            <span className={styles.railCopy}>
+              <span className={styles.cardTitle}>{entry.title}</span>
+            </span>
+          </Link>
+          {seasons === undefined ? (
+            seasonsError ? (
+              <p className={styles.railNote}>Episode counts are unavailable right now.</p>
+            ) : (
+              <Skeleton label="Loading series progress" lines={2} />
+            )
+          ) : (
+            <SeriesProgress
+              progress={entry.progress}
+              seasons={seasons}
+              watchedEpisodes={entry.progress?.watchedEpisodes ?? 0}
+            />
+          )}
+          {next === undefined ? null : next === null ? (
+            <p className={styles.railNote}>Every episode TMDB lists is watched.</p>
+          ) : (
             <Button
               className={styles.railAction}
-              loading={pendingKey === `${entry.mediaType}:${entry.tmdbId}`}
+              loading={pendingKey === titleKey(entry)}
               type="button"
               variant="secondary"
-              onClick={() => onAdvance(entry)}
+              onClick={() => onAdvance(entry, next)}
             >
-              Mark {next} watched
+              Mark {formatEpisode(next)} watched
             </Button>
-          </li>
-        );
-      })}
+          )}
+        </li>
+      ))}
     </ul>
   </section>
 );
@@ -229,6 +250,17 @@ export const LibraryHome = () => {
   const advance = useMutation({
     ...orpc.watch.log.mutationOptions(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.library.overview.key() }),
+  });
+  const counts = libraryQuery.data?.counts ?? { want: 0, watched: 0, watching: 0 };
+  const entries = libraryQuery.data?.entries ?? [];
+  const railEntries = entries.filter(
+    (entry) => entry.status === "watching" && entry.mediaType === "tv",
+  );
+  // Season and episode counts come from the cached TMDB season data, one cached request per series.
+  const seasonQueries = useQueries({
+    queries: railEntries.map((entry) =>
+      orpc.tmdb.tv.detail.queryOptions({ input: { id: entry.tmdbId } }),
+    ),
   });
 
   // The saved view is applied after hydration so the server and first client render match.
@@ -255,11 +287,16 @@ export const LibraryHome = () => {
     );
   }
 
-  const counts = libraryQuery.data?.counts ?? { want: 0, watched: 0, watching: 0 };
-  const entries = libraryQuery.data?.entries ?? [];
+  const rail: RailItem[] = railEntries.map((entry, index) => {
+    const seasons = seasonQueries[index]?.data?.seasons;
+    return {
+      entry,
+      next: seasons === undefined ? undefined : nextEpisode(seasons, entry.progress),
+      seasons,
+      seasonsError: seasonQueries[index]?.isError ?? false,
+    };
+  });
   const visible = entries.filter((entry) => entry.status === status);
-  const railEntries =
-    status === "watching" ? visible.filter((entry) => entry.progress !== null) : [];
   const statusOptions: Segment[] = LIBRARY_STATUS_ACTIONS.map(({ label, status: value }) => ({
     accessory: <Badge size="sm">{counts[value]}</Badge>,
     label,
@@ -278,14 +315,11 @@ export const LibraryHome = () => {
     saveView(value);
   };
 
-  const advanceEpisode = (entry: LibraryItem) => {
-    if (entry.progress === null) {
-      return;
-    }
+  const advanceEpisode = (entry: LibraryItem, next: EpisodePosition) => {
     advance.mutate({
-      episode: entry.progress.episode + 1,
+      episode: next.episode,
       mediaType: entry.mediaType,
-      season: entry.progress.season,
+      season: next.season,
       tmdbId: entry.tmdbId,
       watchedOn: toIsoDate(new Date()),
     });
@@ -318,14 +352,14 @@ export const LibraryHome = () => {
               onValueChange={changeView}
             />
           </div>
-          {railEntries.length === 0 ? null : (
+          {status === "watching" && rail.length > 0 ? (
             <ContinueWatching
-              entries={railEntries}
+              items={rail}
               pendingKey={pendingKey}
               saveError={advance.isError}
               onAdvance={advanceEpisode}
             />
-          )}
+          ) : null}
           {visible.length === 0 ? (
             <EmptyState {...EMPTY_STATES[status]} />
           ) : view === "grid" ? (

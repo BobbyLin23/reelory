@@ -52,6 +52,130 @@ export const formatRuntime = (minutes: number | null | undefined): string | null
 
 export const formatVote = (value: number): string => value.toFixed(1);
 
+export interface EpisodePosition {
+  episode: number;
+  season: number;
+}
+
+export interface SeasonSummary {
+  episodeCount: number;
+  seasonNumber: number;
+}
+
+/** TMDB season summaries without specials (season 0) or announced empty seasons, in order. */
+export const regularSeasons = <T extends SeasonSummary>(seasons: readonly T[]): T[] =>
+  seasons
+    .filter((season) => season.seasonNumber >= 1 && season.episodeCount > 0)
+    .toSorted((left, right) => left.seasonNumber - right.seasonNumber);
+
+export const seriesTotals = (
+  seasons: readonly SeasonSummary[],
+): { episodeCount: number; seasonCount: number } => {
+  const regular = regularSeasons(seasons);
+  return {
+    episodeCount: regular.reduce((total, season) => total + season.episodeCount, 0),
+    seasonCount: regular.length,
+  };
+};
+
+export const formatEpisode = ({ episode, season }: EpisodePosition): string =>
+  `S${season}E${episode}`;
+
+/** Orders episodes the way they air: by season first, then by episode. */
+export const compareEpisodes = (left: EpisodePosition, right: EpisodePosition): number =>
+  left.season === right.season ? left.episode - right.episode : left.season - right.season;
+
+/**
+ * The episode after `progress`, rolling into the next season when the current
+ * season ends. Null means the cached season data has no further episode, and
+ * the library status stays exactly as the user set it.
+ */
+export const nextEpisode = (
+  seasons: readonly SeasonSummary[],
+  progress: EpisodePosition | null,
+): EpisodePosition | null => {
+  const regular = regularSeasons(seasons);
+  const [firstSeason] = regular;
+  if (firstSeason === undefined) {
+    return null;
+  }
+  if (progress === null) {
+    return { episode: 1, season: firstSeason.seasonNumber };
+  }
+  const current = regular.find((season) => season.seasonNumber === progress.season);
+  if (current !== undefined && progress.episode < current.episodeCount) {
+    return { episode: progress.episode + 1, season: progress.season };
+  }
+  const following = regular.find((season) => season.seasonNumber > progress.season);
+  return following === undefined ? null : { episode: 1, season: following.seasonNumber };
+};
+
+/**
+ * Every episode strictly after `progress` through `target`, resolved from TMDB's
+ * season counts. A target at or behind the furthest watched episode yields an
+ * empty list, so choosing an earlier episode never fills episodes implicitly.
+ */
+export const episodesThrough = (
+  seasons: readonly SeasonSummary[],
+  progress: EpisodePosition | null,
+  target: EpisodePosition,
+): EpisodePosition[] => {
+  if (progress !== null && compareEpisodes(target, progress) <= 0) {
+    return [];
+  }
+  const regular = regularSeasons(seasons);
+  const targetSeason = regular.find((season) => season.seasonNumber === target.season);
+  if (targetSeason === undefined || target.episode > targetSeason.episodeCount) {
+    return [];
+  }
+  const episodes: EpisodePosition[] = [];
+  for (const season of regular) {
+    if (season.seasonNumber > target.season) {
+      break;
+    }
+    if (progress !== null && season.seasonNumber < progress.season) {
+      continue;
+    }
+    const from =
+      progress !== null && season.seasonNumber === progress.season ? progress.episode + 1 : 1;
+    const to = season.seasonNumber === target.season ? target.episode : season.episodeCount;
+    for (let episode = from; episode <= to; episode += 1) {
+      episodes.push({ episode, season: season.seasonNumber });
+    }
+  }
+  return episodes;
+};
+
+/** The furthest episode recorded for a title, which is what "watched through" shows. */
+export const furthestEpisode = (
+  watches: readonly { episode: number | null; season: number | null }[],
+): EpisodePosition | null => {
+  let furthest: EpisodePosition | null = null;
+  for (const watch of watches) {
+    if (watch.episode === null || watch.season === null) {
+      continue;
+    }
+    const position = { episode: watch.episode, season: watch.season };
+    if (furthest === null || compareEpisodes(position, furthest) > 0) {
+      furthest = position;
+    }
+  }
+  return furthest;
+};
+
+/** Distinct episodes watched, so a rewatch does not push progress past the bar. */
+export const watchedEpisodeCount = (
+  watches: readonly { episode: number | null; season: number | null }[],
+): number => {
+  const seen = new Set<string>();
+  for (const { episode, season } of watches) {
+    if (episode !== null && season !== null) {
+      seen.add(`${season}:${episode}`);
+    }
+  }
+  return seen.size;
+};
+
 export const toIsoDate = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
