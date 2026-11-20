@@ -1,7 +1,24 @@
+import { localeFromAcceptLanguage } from "@reelory/api/tmdb/locale";
+
 import { PageIntro } from "@/components/page-intro";
+import { LocalePreferences } from "@/components/settings/locale-preferences";
+
+import type { Route } from "./+types/_app.settings";
 
 export const meta = () => [{ title: "Settings · reelory" }];
 
-export default function Settings() {
-  return <PageIntro title="Settings" description="Account, appearance, and other preferences." />;
+export const loader = ({ request }: Route.LoaderArgs) => ({
+  locale: localeFromAcceptLanguage(request.headers.get("accept-language")),
+});
+
+export default function Settings({ loaderData }: Route.ComponentProps) {
+  return (
+    <>
+      <PageIntro
+        description="Choose the language and region used for titles and streaming providers."
+        title="Settings"
+      />
+      <LocalePreferences defaultLocale={loaderData.locale} />
+    </>
+  );
 }

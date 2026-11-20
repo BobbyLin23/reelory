@@ -73,6 +73,19 @@ export const watchEntries = sqliteTable(
   ],
 );
 
+// One row per user for metadata language and watch region (D6). Both are
+// request parameters for TMDB, never columns on a library entry, because they
+// only choose which metadata is fetched. A null column means the user has not
+// saved that preference and the request locale applies.
+export const userPreferences = sqliteTable("user_preferences", {
+  language: text("language"),
+  region: text("region"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  userId: text("user_id").primaryKey(),
+});
+
 export const lists = sqliteTable(
   "lists",
   {

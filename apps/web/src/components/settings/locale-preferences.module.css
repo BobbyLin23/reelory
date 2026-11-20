@@ -1,0 +1,22 @@
+.section {
+  display: grid;
+  max-width: 28rem;
+  margin-block-start: var(--space-10);
+  gap: var(--space-4);
+}
+
+.heading {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 500;
+}
+
+.form {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

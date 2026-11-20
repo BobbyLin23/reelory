@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
 
+import type { TmdbLocale } from "./locale";
 import type {
   NamedEntity,
   TmdbCredits,
@@ -45,6 +46,8 @@ export interface TmdbClientOptions {
   apiKey: string;
   cache?: TmdbCache | undefined;
   fetch?: typeof fetch | undefined;
+  /** Locale for calls that do not pass their own `language` or `region` (D6). */
+  locale?: TmdbLocale | undefined;
 }
 
 type PageInput = TmdbLocaleInput & {
@@ -496,10 +499,14 @@ export const createTmdbClient = ({
   apiKey,
   cache,
   fetch: fetchImpl = fetch,
+  locale,
 }: TmdbClientOptions) => {
+  const defaultLanguage = locale?.language ?? DEFAULT_LANGUAGE;
+  const defaultRegion = locale?.region ?? DEFAULT_REGION;
+
   const request = async <Raw, Result>(
     path: string,
-    { language = DEFAULT_LANGUAGE, ...params }: Record<string, string | number | undefined>,
+    { language = defaultLanguage, ...params }: Record<string, string | number | undefined>,
     ttlSeconds: number,
     map: (raw: Raw) => Result,
   ): Promise<Result> => {
@@ -601,7 +608,7 @@ export const createTmdbClient = ({
           toImages,
         ),
 
-      nowPlaying: ({ language, page, region = DEFAULT_REGION }: PageInput) =>
+      nowPlaying: ({ language, page, region = defaultRegion }: PageInput) =>
         request<RawPage, TmdbMediaPage>(
           "/movie/now_playing",
           { language, page: page ?? 1, region },
@@ -609,7 +616,7 @@ export const createTmdbClient = ({
           (raw) => toMediaPage(raw, "movie"),
         ),
 
-      upcoming: ({ language, page, region = DEFAULT_REGION }: PageInput) =>
+      upcoming: ({ language, page, region = defaultRegion }: PageInput) =>
         request<RawPage, TmdbMediaPage>(
           "/movie/upcoming",
           { language, page: page ?? 1, region },
@@ -617,7 +624,7 @@ export const createTmdbClient = ({
           (raw) => toMediaPage(raw, "movie"),
         ),
 
-      watchProviders: ({ id, language, region = DEFAULT_REGION }: MediaInput) =>
+      watchProviders: ({ id, language, region = defaultRegion }: MediaInput) =>
         request<RawWatchProviders, TmdbWatchProviders>(
           `/movie/${id}/watch/providers`,
           { language },
@@ -683,7 +690,7 @@ export const createTmdbClient = ({
           toSeasonDetail,
         ),
 
-      watchProviders: ({ id, language, region = DEFAULT_REGION }: MediaInput) =>
+      watchProviders: ({ id, language, region = defaultRegion }: MediaInput) =>
         request<RawWatchProviders, TmdbWatchProviders>(
           `/tv/${id}/watch/providers`,
           { language },

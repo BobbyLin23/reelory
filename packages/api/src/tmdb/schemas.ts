@@ -6,7 +6,7 @@ const isoDate = z.string().nullable();
 
 // ISO 639-1 languages and ISO 3166-1 alpha-2 regions. Validate membership as
 // well as shape so two-letter placeholders such as xx and ZZ don't pass.
-const languages = new Set(
+export const SUPPORTED_LANGUAGES = new Set(
   `
   aa ab ae af ak am an ar as av ay az ba be bg bh bi bm bn bo br bs ca ce ch co cr cs cu cv cy da
   de dv dz ee el en eo es et eu fa ff fi fj fo fr fy ga gd gl gn gu gv ha he hi ho hr ht hu hy hz
@@ -18,7 +18,7 @@ const languages = new Set(
     .trim()
     .split(/\s+/u),
 );
-const regions = new Set(
+export const SUPPORTED_REGIONS = new Set(
   `
   AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS
   BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE
@@ -39,12 +39,15 @@ export const tmdbLocaleInput = z.object({
     .regex(/^[a-z]{2}(?:-[A-Z]{2})?$/u, "Use a language code like en or zh-CN")
     .refine((value) => {
       const [language, region] = value.split("-");
-      return languages.has(language ?? "") && (region === undefined || regions.has(region));
+      return (
+        SUPPORTED_LANGUAGES.has(language ?? "") &&
+        (region === undefined || SUPPORTED_REGIONS.has(region))
+      );
     }, "Use an ISO 639-1 language with an optional ISO 3166-1 region")
     .optional(),
   region: z
     .string()
-    .refine((value) => regions.has(value), "Use a two-letter ISO 3166-1 region code")
+    .refine((value) => SUPPORTED_REGIONS.has(value), "Use a two-letter ISO 3166-1 region code")
     .optional(),
 });
 export type TmdbLocaleInput = z.infer<typeof tmdbLocaleInput>;
