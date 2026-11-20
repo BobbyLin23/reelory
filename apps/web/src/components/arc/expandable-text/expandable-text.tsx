@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CSSProperties, FocusEvent, HTMLAttributes, ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import type { AnimationPlaybackControls } from "motion/react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { CSSProperties, FocusEvent, HTMLAttributes, ReactNode } from "react";
+
 import { motionTokens } from "../lib/motion-tokens";
+
 import styles from "./expandable-text.module.css";
 
 /**
@@ -38,12 +40,27 @@ const closeDuration = (distance: number) => standard + Math.min(distance / 2000,
 
 /** Reduced motion only counts after hydration, so the server and the first client render agree. */
 function useReduced() {
-  const hydrated = useSyncExternalStore(noop, () => true, () => false);
+  const hydrated = useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
   const reduced = useReducedMotion() ?? false;
   return hydrated && reduced;
 }
 
-export function ExpandableText({ children, lines = 3, expanded: expandedProp, defaultExpanded = false, onExpandedChange, moreLabel = "Read more", lessLabel = "Show less", className, style, ...props }: ExpandableTextProps) {
+export function ExpandableText({
+  children,
+  lines = 3,
+  expanded: expandedProp,
+  defaultExpanded = false,
+  onExpandedChange,
+  moreLabel = "Read more",
+  lessLabel = "Show less",
+  className,
+  style,
+  ...props
+}: ExpandableTextProps) {
   const [uncontrolled, setUncontrolled] = useState(defaultExpanded);
   const expanded = expandedProp ?? uncontrolled;
   // Long text is the common case, so the server renders the toggle and the first measurement removes it when the text fits.
@@ -67,27 +84,40 @@ export function ExpandableText({ children, lines = 3, expanded: expandedProp, de
   const rotate = useTransform(progress, [0, 1], [0, 180]);
   // The fade eases away as the text opens and only returns as it nears the clamp again. While the height moves, newly revealed lines
   // rise through the soft edge instead of being uncovered by a hard line.
-  const maskImage = useTransform(progress, value => {
-    const fade = Math.pow(1 - Math.min(Math.max(value, 0), 1), 1.35);
-    return fade <= 0.002 ? "none" : `linear-gradient(to bottom, #000 calc(100% - 1.6lh), rgb(0 0 0 / ${(1 - fade * 0.96).toFixed(3)}) 100%)`;
+  const maskImage = useTransform(progress, (value) => {
+    const fade = (1 - Math.min(Math.max(value, 0), 1)) ** 1.35;
+    return fade <= 0.002
+      ? "none"
+      : `linear-gradient(to bottom, #000 calc(100% - 1.6lh), rgb(0 0 0 / ${(1 - fade * 0.96).toFixed(3)}) 100%)`;
   });
 
-  useEffect(() => progress.on("change", value => {
-    if (!running.current) return;
-    const { from, to } = range.current;
-    height.set(from + (to - from) * value);
-  }), [progress, height]);
+  useEffect(
+    () =>
+      progress.on("change", (value) => {
+        if (!running.current) {
+          return;
+        }
+        const { from, to } = range.current;
+        height.set(from + (to - from) * value);
+      }),
+    [progress, height],
+  );
 
   // The probe is exactly `lines` lines tall in the text's own line height, so fonts, sizes, and wrapping never need to be computed by hand.
   useLayoutEffect(() => {
-    const probeNode = probe.current, innerNode = inner.current;
-    if (!probeNode || !innerNode) return;
+    const probeNode = probe.current;
+    const innerNode = inner.current;
+    if (!probeNode || !innerNode) {
+      return;
+    }
     const measure = () => {
       clampHeight.current = probeNode.getBoundingClientRect().height;
       setOverflowing(innerNode.getBoundingClientRect().height > clampHeight.current + 1);
     };
     measure();
-    if (typeof ResizeObserver === "undefined") return;
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
     const observer = new ResizeObserver(measure);
     observer.observe(probeNode);
     observer.observe(innerNode);
@@ -96,12 +126,21 @@ export function ExpandableText({ children, lines = 3, expanded: expandedProp, de
 
   // Animate whenever the open state changes, from the toggle or a controlled prop. A change mid-flight carries on from the current height.
   useLayoutEffect(() => {
-    if (lastExpanded.current === expanded) return;
+    if (lastExpanded.current === expanded) {
+      return;
+    }
     lastExpanded.current = expanded;
-    const node = content.current, innerNode = inner.current;
+    const node = content.current;
+    const innerNode = inner.current;
     running.current?.stop();
     running.current = null;
-    if (!node || !innerNode || reduced) { progress.set(expanded ? 1 : 0); height.set("auto"); setAnimating(false); setSettled(expanded); return; }
+    if (!node || !innerNode || reduced) {
+      progress.set(expanded ? 1 : 0);
+      height.set("auto");
+      setAnimating(false);
+      setSettled(expanded);
+      return;
+    }
     const full = innerNode.getBoundingClientRect().height;
     const clamp = Math.min(clampHeight.current, full);
     const current = node.getBoundingClientRect().height;
@@ -118,53 +157,108 @@ export function ExpandableText({ children, lines = 3, expanded: expandedProp, de
     running.current = animate(progress, target, {
       duration: expanded ? openDuration(distance) : closeDuration(distance),
       ease: [...ease],
-      onComplete: () => { running.current = null; height.set("auto"); setAnimating(false); setSettled(expanded); },
+      onComplete: () => {
+        running.current = null;
+        height.set("auto");
+        setAnimating(false);
+        setSettled(expanded);
+      },
     });
   }, [expanded, reduced, progress, height]);
 
   useEffect(() => () => running.current?.stop(), []);
 
   const setExpanded = (next: boolean) => {
-    if (next === expanded) return;
+    if (next === expanded) {
+      return;
+    }
     // Closing from far down the page would leave the reader below the text; bring its start back into view as it closes.
     const node = root.current;
-    if (!next && node && node.getBoundingClientRect().top < 0) node.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
-    if (expandedProp === undefined) setUncontrolled(next);
+    if (!next && node && node.getBoundingClientRect().top < 0) {
+      node.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+    }
+    if (expandedProp === undefined) {
+      setUncontrolled(next);
+    }
     onExpandedChange?.(next);
   };
 
   // A link or button hidden below the clamp opens the text when it receives keyboard focus.
   const onFocusCapture = (event: FocusEvent<HTMLDivElement>) => {
     props.onFocusCapture?.(event);
-    if (expanded || !overflowing || event.target === content.current || !content.current?.contains(event.target)) return;
-    const box = content.current?.getBoundingClientRect(), target = event.target.getBoundingClientRect();
-    if (box && target.bottom > box.bottom + 1) setExpanded(true);
+    if (
+      expanded ||
+      !overflowing ||
+      event.target === content.current ||
+      !content.current?.contains(event.target)
+    ) {
+      return;
+    }
+    const box = content.current?.getBoundingClientRect();
+    const target = event.target.getBoundingClientRect();
+    if (box && target.bottom > box.bottom + 1) {
+      setExpanded(true);
+    }
   };
 
   const clamped = !settled && !animating && overflowing;
   const masked = overflowing && (!settled || animating);
-  return <div {...props} ref={root} onFocusCapture={onFocusCapture} className={[styles.root, className].filter(Boolean).join(" ")} style={{ ...style, "--expandable-text-lines": lines } as CSSProperties}>
-    <motion.div
-      ref={content}
-      id={contentId}
-      className={styles.content}
-      data-clamped={clamped ? "" : undefined}
-      style={{ height, WebkitMaskImage: masked ? maskImage : "none", maskImage: masked ? maskImage : "none" }}
+  return (
+    <div
+      {...props}
+      ref={root}
+      onFocusCapture={onFocusCapture}
+      className={[styles.root, className].filter(Boolean).join(" ")}
+      style={{ ...style, "--expandable-text-lines": lines } as CSSProperties}
     >
-      <span ref={probe} className={styles.probe} aria-hidden="true" />
-      <div ref={inner} className={styles.inner}>{children}</div>
-    </motion.div>
-    {overflowing && <button type="button" className={styles.toggle} aria-expanded={expanded} aria-controls={contentId} onClick={() => setExpanded(!expanded)}>
-      {/* Both labels share one grid cell, so the button keeps the wider width and the chevron never jumps as they crossfade. */}
-      <span className={styles.labels}>
-        <span className={styles.label} data-active={!expanded || undefined} aria-hidden={expanded || undefined}>{moreLabel}</span>
-        <span className={styles.label} data-active={expanded || undefined} aria-hidden={!expanded || undefined}>{lessLabel}</span>
-      </span>
-      <motion.span className={styles.icon} aria-hidden="true" style={{ rotate }}>
-        <ChevronDown width={16} height={16} strokeWidth={1.75} />
-      </motion.span>
-    </button>}
-  </div>;
+      <motion.div
+        ref={content}
+        id={contentId}
+        className={styles.content}
+        data-clamped={clamped ? "" : undefined}
+        style={{
+          WebkitMaskImage: masked ? maskImage : "none",
+          height,
+          maskImage: masked ? maskImage : "none",
+        }}
+      >
+        <span ref={probe} className={styles.probe} aria-hidden="true" />
+        <div ref={inner} className={styles.inner}>
+          {children}
+        </div>
+      </motion.div>
+      {overflowing && (
+        <button
+          type="button"
+          className={styles.toggle}
+          aria-expanded={expanded}
+          aria-controls={contentId}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {/* Both labels share one grid cell, so the button keeps the wider width and the chevron never jumps as they crossfade. */}
+          <span className={styles.labels}>
+            <span
+              className={styles.label}
+              data-active={!expanded || undefined}
+              aria-hidden={expanded || undefined}
+            >
+              {moreLabel}
+            </span>
+            <span
+              className={styles.label}
+              data-active={expanded || undefined}
+              aria-hidden={!expanded || undefined}
+            >
+              {lessLabel}
+            </span>
+          </span>
+          <motion.span className={styles.icon} aria-hidden="true" style={{ rotate }}>
+            <ChevronDown width={16} height={16} strokeWidth={1.75} />
+          </motion.span>
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default ExpandableText;

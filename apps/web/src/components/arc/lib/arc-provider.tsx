@@ -15,7 +15,8 @@
  * Any component that accepts these props works, such as a locale-aware Link from next-intl or a React Router Link
  * wrapped to map `href` to `to`.
  */
-import { createContext, createElement, useContext, useMemo, type AnchorHTMLAttributes, type ComponentType, type ImgHTMLAttributes, type ReactNode, type Ref } from "react";
+import { createContext, createElement, useContext, useMemo } from "react";
+import type { AnchorHTMLAttributes, ComponentType, ImgHTMLAttributes, ReactNode, Ref } from "react";
 
 /** The props Arc passes to a link: an href plus ordinary anchor attributes. */
 export interface ArcLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
@@ -27,7 +28,10 @@ export interface ArcLinkProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
  * The props Arc passes to an image. A subset of next/image's props, so next/image can be passed as is: either `fill`
  * (cover the positioned parent) or `width` and `height`, plus `sizes` and `priority` as hints.
  */
-export interface ArcImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src" | "alt" | "width" | "height" | "loading" | "srcSet"> {
+export interface ArcImageProps extends Omit<
+  ImgHTMLAttributes<HTMLImageElement>,
+  "src" | "alt" | "width" | "height" | "loading" | "srcSet"
+> {
   src: string;
   alt: string;
   width?: number;
@@ -48,12 +52,21 @@ export function ArcAnchor(props: ArcLinkProps) {
   return <a {...props} />;
 }
 
-const fillStyle = { position: "absolute", inset: 0, width: "100%", height: "100%" } as const;
+const fillStyle = { height: "100%", inset: 0, position: "absolute", width: "100%" } as const;
 
 /** The default image: a plain, lazily decoded `<img>` that understands `fill` and `priority`. */
 export function ArcImg({ alt, fill, priority, loading, style, ...props }: ArcImageProps) {
   // eslint-disable-next-line @next/next/no-img-element -- the framework-free default; pass next/image through ArcProvider instead.
-  return <img alt={alt} decoding="async" {...props} loading={loading ?? (priority ? "eager" : "lazy")} fetchPriority={priority ? "high" : props.fetchPriority} style={fill ? { ...fillStyle, ...style } : style} />;
+  return (
+    <img
+      alt={alt}
+      decoding="async"
+      {...props}
+      loading={loading ?? (priority ? "eager" : "lazy")}
+      fetchPriority={priority ? "high" : props.fetchPriority}
+      style={fill ? { ...fillStyle, ...style } : style}
+    />
+  );
 }
 
 interface ArcComponents {
@@ -61,7 +74,7 @@ interface ArcComponents {
   image: ArcImageComponent;
 }
 
-const ArcContext = createContext<ArcComponents>({ link: ArcAnchor, image: ArcImg });
+const ArcContext = createContext<ArcComponents>({ image: ArcImg, link: ArcAnchor });
 
 export interface ArcProviderProps {
   /** The link component Arc renders for navigation, such as next/link or your own wrapped Link. Defaults to `<a>`. */
@@ -74,7 +87,10 @@ export interface ArcProviderProps {
 /** Sets the link and image components for every Arc component inside it. Nested providers inherit what they do not set. */
 export function ArcProvider({ link, image, children }: ArcProviderProps) {
   const parent = useContext(ArcContext);
-  const value = useMemo(() => ({ link: link ?? parent.link, image: image ?? parent.image }), [link, image, parent]);
+  const value = useMemo(
+    () => ({ image: image ?? parent.image, link: link ?? parent.link }),
+    [link, image, parent],
+  );
   return <ArcContext.Provider value={value}>{children}</ArcContext.Provider>;
 }
 

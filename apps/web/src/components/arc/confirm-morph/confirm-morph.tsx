@@ -1,11 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode, Ref } from "react";
-import { AnimatePresence, animate, motion, useIsPresent, useMotionValue, useMotionValueEvent, useReducedMotion, useTransform } from "motion/react";
-import type { AnimationPlaybackControls, MotionValue, Transition, Variants } from "motion/react";
 import { CircleAlert, LoaderCircle } from "lucide-react";
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useIsPresent,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useTransform,
+} from "motion/react";
+import type { AnimationPlaybackControls, MotionValue, Transition, Variants } from "motion/react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  Ref,
+} from "react";
+
 import { motionTokens } from "../lib/motion-tokens";
+
 import styles from "./confirm-morph.module.css";
 
 /** Where the control is in its life: resting, asking, working, finished, or failed. */
@@ -80,16 +105,27 @@ type Bezier = [number, number, number, number];
 const enter = [...motionTokens.ease.enter] as Bezier;
 const standard = [...motionTokens.ease.standard] as Bezier;
 /** Duration springs restated as stiffness and damping, so a retarget mid-flight keeps the velocity it already has. */
-const physical = ({ visualDuration, bounce }: { visualDuration: number; bounce: number }): Transition => {
-  const root = 2 * Math.PI / (visualDuration * 1.2);
-  return { type: "spring", stiffness: root * root, damping: 2 * (1 - bounce) * root, mass: 1 };
+const physical = ({
+  visualDuration,
+  bounce,
+}: {
+  visualDuration: number;
+  bounce: number;
+}): Transition => {
+  const root = (2 * Math.PI) / (visualDuration * 1.2);
+  return { damping: 2 * (1 - bounce) * root, mass: 1, stiffness: root * root, type: "spring" };
 };
 /** Short, critically damped width springs: the pill reaches the new face in under 300ms and never overshoots. Shrinking is a touch faster. */
-const GROW = physical({ visualDuration: .28, bounce: 0 }), SHRINK = physical({ visualDuration: .24, bounce: 0 });
+const GROW = physical({ bounce: 0, visualDuration: 0.28 });
+const SHRINK = physical({ bounce: 0, visualDuration: 0.24 });
 
 const subscribe = () => () => {};
 function useReducedFlag() {
-  const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
+  const hydrated = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
   return !!useReducedMotion() && hydrated;
 }
 
@@ -99,25 +135,51 @@ function useReducedFlag() {
  * arrives as a whole (no stagger chain) right behind it, clearing a 2px blur.
  */
 const faceVariants: Variants = {
+  gone: {
+    filter: `blur(${blur.subtle}px)`,
+    opacity: 0,
+    transition: { duration: motionTokens.duration.instant, ease: standard },
+  },
   hidden: { opacity: 1 },
   shown: { opacity: 1 },
-  gone: { opacity: 0, filter: `blur(${blur.subtle}px)`, transition: { duration: motionTokens.duration.instant, ease: standard } },
 };
 const partVariants: Variants = {
-  hidden: { opacity: 0, filter: `blur(${blur.subtle}px)` },
-  shown: { opacity: 1, filter: "blur(0px)", transition: { duration: .18, ease: enter, delay: .03 } },
+  hidden: { filter: `blur(${blur.subtle}px)`, opacity: 0 },
+  shown: {
+    filter: "blur(0px)",
+    opacity: 1,
+    transition: { delay: 0.03, duration: 0.18, ease: enter },
+  },
 };
-const reducedFace: Variants = { hidden: { opacity: 0 }, shown: { opacity: 1, transition: { duration: motionTokens.duration.instant } }, gone: { opacity: 0, transition: { duration: .08 } } };
+const reducedFace: Variants = {
+  gone: { opacity: 0, transition: { duration: 0.08 } },
+  hidden: { opacity: 0 },
+  shown: { opacity: 1, transition: { duration: motionTokens.duration.instant } },
+};
 const reducedPart: Variants = { hidden: { opacity: 1 }, shown: { opacity: 1 } };
 
 type FaceKey = ConfirmMorphState | "counting";
 
-function Face({ id, reduced, onSize, children, labelledBy }: { id: FaceKey; reduced: boolean; onSize: (id: FaceKey, width: number) => void; children: ReactNode; labelledBy?: string }) {
+function Face({
+  id,
+  reduced,
+  onSize,
+  children,
+  labelledBy,
+}: {
+  id: FaceKey;
+  reduced: boolean;
+  onSize: (id: FaceKey, width: number) => void;
+  children: ReactNode;
+  labelledBy?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const present = useIsPresent();
   useLayoutEffect(() => {
     const node = ref.current;
-    if (!node || !present) return;
+    if (!node || !present) {
+      return;
+    }
     // Fractional widths, so the spring lands exactly where the pill's natural width is and the hand back to auto is seamless.
     // The pill shrinks a little while pressed; divide that out so a face mounted mid press still reports its true width.
     const report = () => {
@@ -127,55 +189,150 @@ function Face({ id, reduced, onSize, children, labelledBy }: { id: FaceKey; redu
       onSize(id, node.getBoundingClientRect().width / scale);
     };
     report();
-    if (typeof ResizeObserver === "undefined") return;
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
     const observer = new ResizeObserver(report);
     observer.observe(node);
     return () => observer.disconnect();
   }, [id, onSize, present]);
-  return <motion.div ref={ref} className={styles.face} data-face={id} role={labelledBy ? "group" : undefined} aria-labelledby={labelledBy}
-    variants={reduced ? reducedFace : faceVariants} initial="hidden" animate="shown" exit="gone" inert={!present || undefined}>{children}</motion.div>;
+  return (
+    <motion.div
+      ref={ref}
+      className={styles.face}
+      data-face={id}
+      role={labelledBy ? "group" : undefined}
+      aria-labelledby={labelledBy}
+      variants={reduced ? reducedFace : faceVariants}
+      initial="hidden"
+      animate="shown"
+      exit="gone"
+      inert={!present || undefined}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
-function Part({ reduced, className, children }: { reduced: boolean; className?: string; children: ReactNode }) {
-  return <motion.span className={[styles.part, className].filter(Boolean).join(" ")} variants={reduced ? reducedPart : partVariants}>{children}</motion.span>;
+function Part({
+  reduced,
+  className,
+  children,
+}: {
+  reduced: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <motion.span
+      className={[styles.part, className].filter(Boolean).join(" ")}
+      variants={reduced ? reducedPart : partVariants}
+    >
+      {children}
+    </motion.span>
+  );
 }
 
 /** A success disc that pops in with a tick drawing across it, the moment the action lands. */
 function Check({ reduced }: { reduced: boolean }) {
-  return <svg className={styles.check} viewBox="0 0 18 18" fill="none" aria-hidden="true">
-    <motion.circle className={styles.checkDisc} cx="9" cy="9" r="8" style={{ transformOrigin: "9px 9px" }}
-      initial={reduced ? false : { scale: .7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ scale: physical(motionTokens.spring.snappy), opacity: { duration: motionTokens.duration.instant } }} />
-    <motion.path className={styles.checkTick} d="M5.6 9.3 7.8 11.4 12.4 6.7" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"
-      initial={reduced ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: motionTokens.duration.standard, ease: enter, delay: .06 }} />
-  </svg>;
+  return (
+    <svg className={styles.check} viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <motion.circle
+        className={styles.checkDisc}
+        cx="9"
+        cy="9"
+        r="8"
+        style={{ transformOrigin: "9px 9px" }}
+        initial={reduced ? false : { opacity: 0, scale: 0.7 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          opacity: { duration: motionTokens.duration.instant },
+          scale: physical(motionTokens.spring.snappy),
+        }}
+      />
+      <motion.path
+        className={styles.checkTick}
+        d="M5.6 9.3 7.8 11.4 12.4 6.7"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={reduced ? false : { pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ delay: 0.06, duration: motionTokens.duration.standard, ease: enter }}
+      />
+    </svg>
+  );
 }
 
 /** A ring that drains with the countdown. */
 function Ring({ progress }: { progress: MotionValue<number> }) {
-  return <svg className={styles.ring} viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <circle className={styles.ringTrack} cx="8" cy="8" r="6.25" strokeWidth="1.75" />
-    <motion.circle className={styles.ringFill} cx="8" cy="8" r="6.25" strokeWidth="1.75" strokeLinecap="round" style={{ pathLength: progress, rotate: -90, transformOrigin: "8px 8px" }} />
-  </svg>;
+  return (
+    <svg className={styles.ring} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle className={styles.ringTrack} cx="8" cy="8" r="6.25" strokeWidth="1.75" />
+      <motion.circle
+        className={styles.ringFill}
+        cx="8"
+        cy="8"
+        r="6.25"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        style={{ pathLength: progress, rotate: -90, transformOrigin: "8px 8px" }}
+      />
+    </svg>
+  );
 }
 
 /** Seconds that swap in place: the old digit fades up and out, the new one rises in, on tabular figures so the width holds. */
 function Seconds({ value, reduced }: { value: number; reduced: boolean }) {
-  return <span className={styles.seconds}>
-    <AnimatePresence initial={false} mode="popLayout">
-      <motion.span key={value} className={styles.digit}
-        initial={reduced ? { opacity: 0 } : { opacity: 0, y: 4, filter: `blur(${blur.subtle}px)` }}
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-        exit={reduced ? { opacity: 0 } : { opacity: 0, y: -4, filter: `blur(${blur.subtle}px)` }}
-        transition={{ duration: motionTokens.duration.fast, ease: enter }}>{value}</motion.span>
-    </AnimatePresence>
-  </span>;
+  return (
+    <span className={styles.seconds}>
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={value}
+          className={styles.digit}
+          initial={
+            reduced ? { opacity: 0 } : { filter: `blur(${blur.subtle}px)`, opacity: 0, y: 4 }
+          }
+          animate={{ filter: "blur(0px)", opacity: 1, y: 0 }}
+          exit={reduced ? { opacity: 0 } : { filter: `blur(${blur.subtle}px)`, opacity: 0, y: -4 }}
+          transition={{ duration: motionTokens.duration.fast, ease: enter }}
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
 }
 
 export function ConfirmMorph({
-  label, icon, prompt, confirmLabel = "Delete", cancelLabel = "Cancel", pendingLabel = "Deleting", doneLabel = "Deleted", errorLabel = "Couldn’t finish",
-  retryLabel = "Retry", undoLabel = "Undo", undoingLabel = "Restoring", tone = "danger", confirmMode = "press", holdDuration = 1000, countdown = 3, countdownLabel,
-  onConfirm, onUndo, onCancel, state: stateProp, defaultState = "idle", onStateChange, confirmTimeout = 6000, resultTimeout = 5000, cancelOnOutsidePress = true,
-  disabled = false, className, ref,
+  label,
+  icon,
+  prompt,
+  confirmLabel = "Delete",
+  cancelLabel = "Cancel",
+  pendingLabel = "Deleting",
+  doneLabel = "Deleted",
+  errorLabel = "Couldn’t finish",
+  retryLabel = "Retry",
+  undoLabel = "Undo",
+  undoingLabel = "Restoring",
+  tone = "danger",
+  confirmMode = "press",
+  holdDuration = 1000,
+  countdown = 3,
+  countdownLabel,
+  onConfirm,
+  onUndo,
+  onCancel,
+  state: stateProp,
+  defaultState = "idle",
+  onStateChange,
+  confirmTimeout = 6000,
+  resultTimeout = 5000,
+  cancelOnOutsidePress = true,
+  disabled = false,
+  className,
+  ref,
 }: ConfirmMorphProps) {
   const reduced = useReducedFlag();
   const uid = useId();
@@ -191,8 +348,10 @@ export function ConfirmMorph({
   const [announcement, setAnnouncement] = useState("");
   const faceKey: FaceKey = state === "confirming" && counting ? "counting" : state;
 
-  const live = useRef({ state, onStateChange, controlled: stateProp !== undefined });
-  useLayoutEffect(() => { live.current = { state, onStateChange, controlled: stateProp !== undefined }; });
+  const live = useRef({ controlled: stateProp !== undefined, onStateChange, state });
+  useLayoutEffect(() => {
+    live.current = { controlled: stateProp !== undefined, onStateChange, state };
+  });
   const pendingFocus = useRef(false);
   const run = useRef(0);
   const askedAt = useRef(0);
@@ -200,95 +359,182 @@ export function ConfirmMorph({
   const keepFocus = useCallback(() => {
     const root = rootRef.current;
     // Focus follows the control between faces, but only when it was already inside; a timeout never steals focus from elsewhere.
-    pendingFocus.current = !!root && (root.contains(document.activeElement) || document.activeElement === document.body);
+    pendingFocus.current =
+      !!root && (root.contains(document.activeElement) || document.activeElement === document.body);
   }, []);
 
-  const go = useCallback((next: ConfirmMorphState) => {
-    if (next !== "confirming") setCounting(false);
-    if (next === live.current.state) return;
-    keepFocus();
-    if (next === "confirming") askedAt.current = performance.now();
-    if (!live.current.controlled) setInner(next);
-    live.current.state = next;
-    live.current.onStateChange?.(next);
-  }, [keepFocus]);
+  const go = useCallback(
+    (next: ConfirmMorphState) => {
+      if (next !== "confirming") {
+        setCounting(false);
+      }
+      if (next === live.current.state) {
+        return;
+      }
+      keepFocus();
+      if (next === "confirming") {
+        askedAt.current = performance.now();
+      }
+      if (!live.current.controlled) {
+        setInner(next);
+      }
+      live.current.state = next;
+      live.current.onStateChange?.(next);
+    },
+    [keepFocus],
+  );
 
   // A controlled parent can move the state on its own; the countdown never survives that.
   const [seenState, setSeenState] = useState(state);
   if (seenState !== state) {
     setSeenState(state);
-    if (state !== "confirming") setCounting(false);
+    if (state !== "confirming") {
+      setCounting(false);
+    }
   }
 
-  const toIdle = useCallback(() => { run.current++; go("idle"); }, [go]);
+  const toIdle = useCallback(() => {
+    run.current++;
+    go("idle");
+  }, [go]);
 
-  const perform = useCallback(async (kind: "confirm" | "undo") => {
-    const handler = kind === "confirm" ? onConfirm : onUndo;
-    const token = ++run.current;
-    setWorking(kind);
-    setCounting(false);
-    let result: void | Promise<unknown> | undefined;
-    try { result = handler?.(); }
-    catch { go("error"); setAnnouncement(errorLabel); return; }
-    if (result && typeof (result as Promise<unknown>).then === "function") {
-      go("pending");
-      setAnnouncement(kind === "confirm" ? pendingLabel : undoingLabel);
-      try { await result; }
-      catch {
-        if (token !== run.current) return;
+  const perform = useCallback(
+    async (kind: "confirm" | "undo") => {
+      const handler = kind === "confirm" ? onConfirm : onUndo;
+      const token = ++run.current;
+      setWorking(kind);
+      setCounting(false);
+      let result: void | Promise<unknown> | undefined;
+      try {
+        result = handler?.();
+      } catch {
         go("error");
         setAnnouncement(errorLabel);
         return;
       }
-      if (token !== run.current) return;
-    }
-    if (kind === "undo") { go("idle"); setAnnouncement("Undone"); return; }
-    go("done");
-    setAnnouncement(onUndo ? `${doneLabel}. ${undoLabel} is available.` : doneLabel);
-  }, [doneLabel, errorLabel, go, onConfirm, onUndo, pendingLabel, undoLabel, undoingLabel]);
+      if (result && typeof (result as Promise<unknown>).then === "function") {
+        go("pending");
+        setAnnouncement(kind === "confirm" ? pendingLabel : undoingLabel);
+        try {
+          await result;
+        } catch {
+          if (token !== run.current) {
+            return;
+          }
+          go("error");
+          setAnnouncement(errorLabel);
+          return;
+        }
+        if (token !== run.current) {
+          return;
+        }
+      }
+      if (kind === "undo") {
+        go("idle");
+        setAnnouncement("Undone");
+        return;
+      }
+      go("done");
+      setAnnouncement(onUndo ? `${doneLabel}. ${undoLabel} is available.` : doneLabel);
+    },
+    [doneLabel, errorLabel, go, onConfirm, onUndo, pendingLabel, undoLabel, undoingLabel],
+  );
 
-  const cancel = useCallback(() => { onCancel?.(); toIdle(); setAnnouncement("Cancelled"); }, [onCancel, toIdle]);
+  const cancel = useCallback(() => {
+    onCancel?.();
+    toIdle();
+    setAnnouncement("Cancelled");
+  }, [onCancel, toIdle]);
   const expire = useRef(() => {});
-  useLayoutEffect(() => { expire.current = () => { if (live.current.state === "confirming") cancel(); else toIdle(); }; });
+  useLayoutEffect(() => {
+    expire.current = () => {
+      if (live.current.state === "confirming") {
+        cancel();
+      } else {
+        toIdle();
+      }
+    };
+  });
 
   /* The shape: one pill whose width springs to whichever face is current. At rest it is auto, so it renders right before hydration. */
   const width = useMotionValue<number | "auto">("auto");
   const target = useRef(0);
   const flight = useRef(0);
   // Only the present face reports (a leaving face stops observing), so every report is the current face's width.
-  const onFaceSize = useCallback((_id: FaceKey, w: number) => {
-    if (Math.abs(w - target.current) < .25) return;
-    const from = target.current;
-    target.current = w;
-    if (!from || reduced) { flight.current++; width.jump("auto"); return; }
-    const now = width.get();
-    if (now === "auto") width.jump(from);
-    const token = ++flight.current;
-    animate(width, w, w > (typeof now === "number" ? now : from) ? GROW : SHRINK).then(() => { if (token === flight.current) width.jump("auto"); });
-  }, [reduced, width]);
+  const onFaceSize = useCallback(
+    (_id: FaceKey, w: number) => {
+      if (Math.abs(w - target.current) < 0.25) {
+        return;
+      }
+      const from = target.current;
+      target.current = w;
+      if (!from || reduced) {
+        flight.current++;
+        width.jump("auto");
+        return;
+      }
+      const now = width.get();
+      if (now === "auto") {
+        width.jump(from);
+      }
+      const token = ++flight.current;
+      animate(width, w, w > (typeof now === "number" ? now : from) ? GROW : SHRINK).then(() => {
+        if (token === flight.current) {
+          width.jump("auto");
+        }
+      });
+    },
+    [reduced, width],
+  );
 
   /* The timeout runs as an invisible clock. A pointer resting on the control holds it, and so does a hidden tab. */
   const drain = useMotionValue(1);
   const clock = useRef<AnimationPlaybackControls | null>(null);
-  const holds = useRef({ hover: false, hidden: false });
-  const timeout = state === "confirming" && !counting ? confirmTimeout : state === "done" || state === "error" ? resultTimeout : 0;
+  const holds = useRef({ hidden: false, hover: false });
+  const timeout =
+    state === "confirming" && !counting
+      ? confirmTimeout
+      : state === "done" || state === "error"
+        ? resultTimeout
+        : 0;
   const sync = useCallback(() => {
     const control = clock.current;
-    if (!control) return;
+    if (!control) {
+      return;
+    }
     const held = holds.current.hover || holds.current.hidden;
-    if (held) control.pause(); else control.play();
+    if (held) {
+      control.pause();
+    } else {
+      control.play();
+    }
   }, []);
   useEffect(() => {
-    if (!timeout) return;
+    if (!timeout) {
+      return;
+    }
     drain.jump(1);
     const control = animate(drain, 0, { duration: timeout / 1000, ease: "linear" });
     clock.current = control;
-    control.then(() => { if (clock.current === control) { clock.current = null; expire.current(); } });
+    control.then(() => {
+      if (clock.current === control) {
+        clock.current = null;
+        expire.current();
+      }
+    });
     sync();
-    return () => { if (clock.current === control) clock.current = null; control.stop(); };
+    return () => {
+      if (clock.current === control) {
+        clock.current = null;
+      }
+      control.stop();
+    };
   }, [drain, state, sync, timeout]);
   useEffect(() => {
-    const onVisibility = () => { holds.current.hidden = document.hidden; sync(); };
+    const onVisibility = () => {
+      holds.current.hidden = document.hidden;
+      sync();
+    };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [sync]);
@@ -297,33 +543,50 @@ export function ConfirmMorph({
   const remaining = useMotionValue(1);
   const [seconds, setSeconds] = useState(countdown);
   const performRef = useRef(perform);
-  useLayoutEffect(() => { performRef.current = perform; });
-  useMotionValueEvent(remaining, "change", value => setSeconds(Math.max(1, Math.ceil(value * countdown))));
+  useLayoutEffect(() => {
+    performRef.current = perform;
+  });
+  useMotionValueEvent(remaining, "change", (value) =>
+    setSeconds(Math.max(1, Math.ceil(value * countdown))),
+  );
   useEffect(() => {
-    if (!counting) return;
+    if (!counting) {
+      return;
+    }
     remaining.jump(1);
     const control = animate(remaining, 0, { duration: countdown, ease: "linear" });
-    control.then(() => { void performRef.current("confirm"); });
+    control.then(() => {
+      void performRef.current("confirm");
+    });
     return () => control.stop();
   }, [counting, countdown, remaining]);
 
   /* Hold: the confirm button fills with the danger colour from the left while pressed, and drains back if let go early. */
   const hold = useMotionValue(0);
   const holding = useRef<AnimationPlaybackControls | null>(null);
-  const fillClip = useTransform(hold, value => `inset(0 ${(1 - value) * 100}% 0 0 round 999px)`);
+  const fillClip = useTransform(hold, (value) => `inset(0 ${(1 - value) * 100}% 0 0 round 999px)`);
   const startHold = () => {
-    if (holding.current) return;
-    const control = animate(hold, 1, { duration: holdDuration / 1000 * (1 - hold.get()), ease: "linear" });
+    if (holding.current) {
+      return;
+    }
+    const control = animate(hold, 1, {
+      duration: (holdDuration / 1000) * (1 - hold.get()),
+      ease: "linear",
+    });
     holding.current = control;
     control.then(() => {
-      if (holding.current !== control) return;
+      if (holding.current !== control) {
+        return;
+      }
       holding.current = null;
       void perform("confirm");
     });
   };
   const releaseHold = () => {
     const control = holding.current;
-    if (!control) return;
+    if (!control) {
+      return;
+    }
     holding.current = null;
     control.stop();
     if (hold.get() < 1) {
@@ -331,10 +594,18 @@ export function ConfirmMorph({
       setAnnouncement(`Keep holding to ${confirmLabel.toLowerCase()}`);
     }
   };
-  useEffect(() => { if (state !== "confirming") { holding.current?.stop(); holding.current = null; hold.jump(0); } }, [hold, state]);
+  useEffect(() => {
+    if (state !== "confirming") {
+      holding.current?.stop();
+      holding.current = null;
+      hold.jump(0);
+    }
+  }, [hold, state]);
 
   const answer = () => {
-    if (performance.now() - askedAt.current < ARM_MS) return;
+    if (performance.now() - askedAt.current < ARM_MS) {
+      return;
+    }
     if (confirmMode === "countdown") {
       keepFocus();
       setCounting(true);
@@ -346,18 +617,28 @@ export function ConfirmMorph({
 
   // An outside press answers the question with no.
   useEffect(() => {
-    if (state !== "confirming" || !cancelOnOutsidePress) return;
-    const down = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) cancel(); };
+    if (state !== "confirming" || !cancelOnOutsidePress) {
+      return;
+    }
+    const down = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        cancel();
+      }
+    };
     document.addEventListener("pointerdown", down);
     return () => document.removeEventListener("pointerdown", down);
   }, [cancel, cancelOnOutsidePress, state]);
 
   // Focus moves with the morph: Confirm while asking, the root while counting or working, Undo or Retry on a result, the trigger at rest.
   useLayoutEffect(() => {
-    if (!pendingFocus.current) return;
+    if (!pendingFocus.current) {
+      return;
+    }
     pendingFocus.current = false;
     const root = rootRef.current;
-    if (!root) return;
+    if (!root) {
+      return;
+    }
     const face = root.querySelector<HTMLElement>(`[data-face="${faceKey}"]`);
     const autofocus = face?.querySelector<HTMLElement>("[data-autofocus]:not(:disabled)");
     (autofocus ?? root).focus({ preventScroll: true });
@@ -365,87 +646,263 @@ export function ConfirmMorph({
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
-      if (state === "confirming") { event.preventDefault(); event.stopPropagation(); cancel(); }
-      else if (state === "done" || state === "error") { event.preventDefault(); event.stopPropagation(); toIdle(); }
+      if (state === "confirming") {
+        event.preventDefault();
+        event.stopPropagation();
+        cancel();
+      } else if (state === "done" || state === "error") {
+        event.preventDefault();
+        event.stopPropagation();
+        toIdle();
+      }
       return;
     }
     // Enter answers yes from anywhere in the question except a button of its own (Cancel keeps meaning Cancel).
-    if (event.key === "Enter" && state === "confirming" && !event.repeat && !(event.target instanceof HTMLButtonElement)) {
+    if (
+      event.key === "Enter" &&
+      state === "confirming" &&
+      !event.repeat &&
+      !(event.target instanceof HTMLButtonElement)
+    ) {
       event.preventDefault();
-      if (counting) void perform("confirm");
-      else if (confirmMode !== "hold") answer();
+      if (counting) {
+        void perform("confirm");
+      } else if (confirmMode !== "hold") {
+        answer();
+      }
     }
   };
 
   const holdKeys = (event: ReactKeyboardEvent<HTMLButtonElement>, down: boolean) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
     event.preventDefault();
-    if (down) { if (!event.repeat) startHold(); }
-    else releaseHold();
+    if (down) {
+      if (!event.repeat) {
+        startHold();
+      }
+    } else {
+      releaseHold();
+    }
   };
   const holdPointer = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0) {
+      return;
+    }
     event.currentTarget.setPointerCapture?.(event.pointerId);
     startHold();
   };
 
   const shownPrompt = prompt ?? <>{label}?</>;
   const shownCountdown = countdownLabel ?? `${pendingLabel} in`;
-  const confirmButton = confirmMode === "hold"
-    ? <button type="button" className={styles.confirm} data-autofocus aria-describedby={holdHintId}
-      onPointerDown={holdPointer} onPointerUp={releaseHold} onPointerCancel={releaseHold} onLostPointerCapture={releaseHold}
-      onKeyDown={event => holdKeys(event, true)} onKeyUp={event => holdKeys(event, false)} onBlur={releaseHold} onContextMenu={event => event.preventDefault()}>
-      <span>{confirmLabel}</span>
-      <motion.span className={styles.fill} style={{ clipPath: fillClip }} aria-hidden="true"><span>{confirmLabel}</span></motion.span>
-    </button>
-    : <button type="button" className={styles.confirm} data-autofocus onClick={answer} onKeyDown={event => { if (event.repeat) event.preventDefault(); }}>{confirmLabel}</button>;
+  const confirmButton =
+    confirmMode === "hold" ? (
+      <button
+        type="button"
+        className={styles.confirm}
+        data-autofocus
+        aria-describedby={holdHintId}
+        onPointerDown={holdPointer}
+        onPointerUp={releaseHold}
+        onPointerCancel={releaseHold}
+        onLostPointerCapture={releaseHold}
+        onKeyDown={(event) => holdKeys(event, true)}
+        onKeyUp={(event) => holdKeys(event, false)}
+        onBlur={releaseHold}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <span>{confirmLabel}</span>
+        <motion.span className={styles.fill} style={{ clipPath: fillClip }} aria-hidden="true">
+          <span>{confirmLabel}</span>
+        </motion.span>
+      </button>
+    ) : (
+      <button
+        type="button"
+        className={styles.confirm}
+        data-autofocus
+        onClick={answer}
+        onKeyDown={(event) => {
+          if (event.repeat) {
+            event.preventDefault();
+          }
+        }}
+      >
+        {confirmLabel}
+      </button>
+    );
 
   const face = (() => {
     switch (faceKey) {
-      case "confirming": return <>
-        <Part reduced={reduced} className={styles.prompt}><span id={promptId}>{shownPrompt}</span></Part>
-        <Part reduced={reduced}><button type="button" className={styles.secondary} onClick={cancel}>{cancelLabel}</button></Part>
-        <Part reduced={reduced}>{confirmButton}</Part>
-        {confirmMode === "hold" && <span id={holdHintId} className={styles.srOnly}>Press and hold</span>}
-      </>;
-      case "counting": return <>
-        <Part reduced={reduced} className={styles.status}>
-          <Ring progress={remaining} />
-          <span className={styles.statusText}>{shownCountdown} <Seconds value={seconds} reduced={reduced} /></span>
-        </Part>
-        <Part reduced={reduced}><button type="button" className={styles.secondary} onClick={cancel}>{cancelLabel}</button></Part>
-      </>;
-      case "pending": return <Part reduced={reduced} className={styles.status}>
-        <LoaderCircle className={styles.spinner} size={16} strokeWidth={1.75} aria-hidden="true" />
-        <span className={styles.statusText}>{working === "undo" ? undoingLabel : pendingLabel}</span>
-      </Part>;
-      case "done": return <>
-        <Part reduced={reduced} className={styles.status}><Check reduced={reduced} /><span className={styles.statusText}>{doneLabel}</span></Part>
-        {onUndo && <Part reduced={reduced}><button type="button" className={styles.secondary} data-autofocus onClick={() => void perform("undo")}>{undoLabel}</button></Part>}
-      </>;
-      case "error": return <>
-        <Part reduced={reduced} className={styles.status}><CircleAlert className={styles.alert} size={16} strokeWidth={1.75} aria-hidden="true" /><span className={styles.statusText}>{errorLabel}</span></Part>
-        <Part reduced={reduced}><button type="button" className={styles.secondary} data-autofocus onClick={() => void perform(working)}>{retryLabel}</button></Part>
-      </>;
-      default: return <Part reduced={reduced}><button type="button" className={styles.trigger} data-autofocus disabled={disabled}
-        onClick={() => { setAnnouncement(typeof shownPrompt === "string" ? shownPrompt : ""); go("confirming"); }}>
-        {icon && <span className={styles.icon} aria-hidden="true">{icon}</span>}
-        <span>{label}</span>
-      </button></Part>;
+      case "confirming": {
+        return (
+          <>
+            <Part reduced={reduced} className={styles.prompt}>
+              <span id={promptId}>{shownPrompt}</span>
+            </Part>
+            <Part reduced={reduced}>
+              <button type="button" className={styles.secondary} onClick={cancel}>
+                {cancelLabel}
+              </button>
+            </Part>
+            <Part reduced={reduced}>{confirmButton}</Part>
+            {confirmMode === "hold" && (
+              <span id={holdHintId} className={styles.srOnly}>
+                Press and hold
+              </span>
+            )}
+          </>
+        );
+      }
+      case "counting": {
+        return (
+          <>
+            <Part reduced={reduced} className={styles.status}>
+              <Ring progress={remaining} />
+              <span className={styles.statusText}>
+                {shownCountdown} <Seconds value={seconds} reduced={reduced} />
+              </span>
+            </Part>
+            <Part reduced={reduced}>
+              <button type="button" className={styles.secondary} onClick={cancel}>
+                {cancelLabel}
+              </button>
+            </Part>
+          </>
+        );
+      }
+      case "pending": {
+        return (
+          <Part reduced={reduced} className={styles.status}>
+            <LoaderCircle
+              className={styles.spinner}
+              size={16}
+              strokeWidth={1.75}
+              aria-hidden="true"
+            />
+            <span className={styles.statusText}>
+              {working === "undo" ? undoingLabel : pendingLabel}
+            </span>
+          </Part>
+        );
+      }
+      case "done": {
+        return (
+          <>
+            <Part reduced={reduced} className={styles.status}>
+              <Check reduced={reduced} />
+              <span className={styles.statusText}>{doneLabel}</span>
+            </Part>
+            {onUndo && (
+              <Part reduced={reduced}>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  data-autofocus
+                  onClick={() => void perform("undo")}
+                >
+                  {undoLabel}
+                </button>
+              </Part>
+            )}
+          </>
+        );
+      }
+      case "error": {
+        return (
+          <>
+            <Part reduced={reduced} className={styles.status}>
+              <CircleAlert
+                className={styles.alert}
+                size={16}
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+              <span className={styles.statusText}>{errorLabel}</span>
+            </Part>
+            <Part reduced={reduced}>
+              <button
+                type="button"
+                className={styles.secondary}
+                data-autofocus
+                onClick={() => void perform(working)}
+              >
+                {retryLabel}
+              </button>
+            </Part>
+          </>
+        );
+      }
+      default: {
+        return (
+          <Part reduced={reduced}>
+            <button
+              type="button"
+              className={styles.trigger}
+              data-autofocus
+              disabled={disabled}
+              onClick={() => {
+                setAnnouncement(typeof shownPrompt === "string" ? shownPrompt : "");
+                go("confirming");
+              }}
+            >
+              {icon && (
+                <span className={styles.icon} aria-hidden="true">
+                  {icon}
+                </span>
+              )}
+              <span>{label}</span>
+            </button>
+          </Part>
+        );
+      }
     }
   })();
 
-  return <div ref={rootRef} className={[styles.root, className].filter(Boolean).join(" ")} data-state={state} data-face={faceKey} data-tone={tone} data-mode={confirmMode}
-    data-disabled={disabled || undefined} tabIndex={-1} onKeyDown={onKeyDown} aria-busy={state === "pending" || undefined}
-    onPointerEnter={() => { holds.current.hover = true; sync(); }} onPointerLeave={() => { holds.current.hover = false; sync(); }}
-    onPointerCancel={() => { holds.current.hover = false; sync(); }}>
-    <motion.div className={styles.surface} style={{ width }}>
-      <AnimatePresence initial={false}>
-        <Face key={faceKey} id={faceKey} reduced={reduced} onSize={onFaceSize} labelledBy={faceKey === "confirming" ? promptId : undefined}>{face}</Face>
-      </AnimatePresence>
-    </motion.div>
-    <span className={styles.srOnly} role="status" aria-live="polite">{announcement}</span>
-  </div>;
+  return (
+    <div
+      ref={rootRef}
+      className={[styles.root, className].filter(Boolean).join(" ")}
+      data-state={state}
+      data-face={faceKey}
+      data-tone={tone}
+      data-mode={confirmMode}
+      data-disabled={disabled || undefined}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      aria-busy={state === "pending" || undefined}
+      onPointerEnter={() => {
+        holds.current.hover = true;
+        sync();
+      }}
+      onPointerLeave={() => {
+        holds.current.hover = false;
+        sync();
+      }}
+      onPointerCancel={() => {
+        holds.current.hover = false;
+        sync();
+      }}
+    >
+      <motion.div className={styles.surface} style={{ width }}>
+        <AnimatePresence initial={false}>
+          <Face
+            key={faceKey}
+            id={faceKey}
+            reduced={reduced}
+            onSize={onFaceSize}
+            labelledBy={faceKey === "confirming" ? promptId : undefined}
+          >
+            {face}
+          </Face>
+        </AnimatePresence>
+      </motion.div>
+      <span className={styles.srOnly} role="status" aria-live="polite">
+        {announcement}
+      </span>
+    </div>
+  );
 }
 
 export default ConfirmMorph;
