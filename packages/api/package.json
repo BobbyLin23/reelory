@@ -16,10 +16,12 @@
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
     "@reelory/db": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.5",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@reelory/config": "workspace:*",
+    "miniflare": "5.20261117.0-beta",
     "typescript": "catalog:"
   }
 }
