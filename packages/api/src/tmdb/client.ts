@@ -4,6 +4,7 @@ import type {
   NamedEntity,
   TmdbCredits,
   TmdbImages,
+  TmdbLocaleInput,
   TmdbMediaPage,
   TmdbMediaSummary,
   TmdbMovieDetail,
@@ -13,7 +14,7 @@ import type {
 } from "./schemas";
 
 const TMDB_API_URL = "https://api.themoviedb.org/3";
-const TMDB_LANGUAGE = "en-US";
+const DEFAULT_LANGUAGE = "en-US";
 const DEFAULT_REGION = "US";
 
 /** Bump when the shape of a cached response changes so old entries are ignored. */
@@ -22,6 +23,8 @@ const CACHE_KEY_PREFIX = "tmdb:v1";
 const CACHE_TTL_SECONDS = {
   credits: 86_400,
   detail: 86_400,
+  discover: 900,
+  genres: 86_400,
   images: 86_400,
   search: 3600,
   season: 86_400,
@@ -44,9 +47,9 @@ export interface TmdbClientOptions {
   fetch?: typeof fetch | undefined;
 }
 
-interface PageInput {
+type PageInput = TmdbLocaleInput & {
   page?: number | undefined;
-}
+};
 
 type TrendingInput = PageInput & {
   mediaType: "all" | "movie" | "tv";
@@ -57,16 +60,12 @@ type SearchInput = PageInput & {
   query: string;
 };
 
-interface MediaInput {
+type MediaInput = TmdbLocaleInput & {
   id: number;
-}
+};
 
 type SeasonInput = MediaInput & {
   seasonNumber: number;
-};
-
-type WatchProvidersInput = MediaInput & {
-  region?: string | undefined;
 };
 
 interface RawMediaSummary {
@@ -500,7 +499,7 @@ export const createTmdbClient = ({
 }: TmdbClientOptions) => {
   const request = async <Raw, Result>(
     path: string,
-    params: Record<string, string | number | undefined>,
+    { language = DEFAULT_LANGUAGE, ...params }: Record<string, string | number | undefined>,
     ttlSeconds: number,
     map: (raw: Raw) => Result,
   ): Promise<Result> => {
@@ -511,7 +510,7 @@ export const createTmdbClient = ({
     }
 
     const url = new URL(`${TMDB_API_URL}${path}`);
-    url.searchParams.set("language", TMDB_LANGUAGE);
+    url.searchParams.set("language", String(language));
 
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined) {
@@ -559,83 +558,135 @@ export const createTmdbClient = ({
   };
 
   return {
+    genres: {
+      movie: ({ language }: TmdbLocaleInput) =>
+        request<{ genres?: RawNamed[] }, NamedEntity[]>(
+          "/genre/movie/list",
+          { language },
+          CACHE_TTL_SECONDS.genres,
+          (raw) => toNamedList(raw.genres),
+        ),
+
+      tv: ({ language }: TmdbLocaleInput) =>
+        request<{ genres?: RawNamed[] }, NamedEntity[]>(
+          "/genre/tv/list",
+          { language },
+          CACHE_TTL_SECONDS.genres,
+          (raw) => toNamedList(raw.genres),
+        ),
+    },
+
     movie: {
-      credits: ({ id }: MediaInput) =>
+      credits: ({ id, language }: MediaInput) =>
         request<RawCredits, TmdbCredits>(
           `/movie/${id}/credits`,
-          {},
+          { language },
           CACHE_TTL_SECONDS.credits,
           toCredits,
         ),
 
-      detail: ({ id }: MediaInput) =>
+      detail: ({ id, language }: MediaInput) =>
         request<RawMovieDetail, TmdbMovieDetail>(
           `/movie/${id}`,
-          {},
+          { language },
           CACHE_TTL_SECONDS.detail,
           toMovieDetail,
         ),
 
-      images: ({ id }: MediaInput) =>
+      images: ({ id, language }: MediaInput) =>
         request<RawImages, TmdbImages>(
           `/movie/${id}/images`,
-          {},
+          { language },
           CACHE_TTL_SECONDS.images,
           toImages,
         ),
 
-      watchProviders: ({ id, region = DEFAULT_REGION }: WatchProvidersInput) =>
+      nowPlaying: ({ language, page, region = DEFAULT_REGION }: PageInput) =>
+        request<RawPage, TmdbMediaPage>(
+          "/movie/now_playing",
+          { language, page: page ?? 1, region },
+          CACHE_TTL_SECONDS.discover,
+          (raw) => toMediaPage(raw, "movie"),
+        ),
+
+      upcoming: ({ language, page, region = DEFAULT_REGION }: PageInput) =>
+        request<RawPage, TmdbMediaPage>(
+          "/movie/upcoming",
+          { language, page: page ?? 1, region },
+          CACHE_TTL_SECONDS.discover,
+          (raw) => toMediaPage(raw, "movie"),
+        ),
+
+      watchProviders: ({ id, language, region = DEFAULT_REGION }: MediaInput) =>
         request<RawWatchProviders, TmdbWatchProviders>(
           `/movie/${id}/watch/providers`,
-          {},
+          { language },
           CACHE_TTL_SECONDS.watchProviders,
           (raw) => toWatchProviders(raw, region),
         ),
     },
 
-    search: ({ query, page }: SearchInput) =>
+    search: ({ language, page, query }: SearchInput) =>
       request<RawPage, TmdbMediaPage>(
         "/search/multi",
-        { include_adult: "false", page: page ?? 1, query },
+        { include_adult: "false", language, page: page ?? 1, query },
         CACHE_TTL_SECONDS.search,
         (raw) => toMediaPage(raw),
       ),
 
-    trending: ({ mediaType, window, page }: TrendingInput) =>
+    trending: ({ language, mediaType, page, window }: TrendingInput) =>
       request<RawPage, TmdbMediaPage>(
         `/trending/${mediaType}`,
-        { page: page ?? 1, window },
+        { language, page: page ?? 1, window },
         CACHE_TTL_SECONDS.trending,
         (raw) => toMediaPage(raw, mediaType === "all" ? undefined : mediaType),
       ),
 
     tv: {
-      credits: ({ id }: MediaInput) =>
+      credits: ({ id, language }: MediaInput) =>
         request<RawCredits, TmdbCredits>(
           `/tv/${id}/credits`,
-          {},
+          { language },
           CACHE_TTL_SECONDS.credits,
           toCredits,
         ),
 
-      detail: ({ id }: MediaInput) =>
-        request<RawTvDetail, TmdbTvDetail>(`/tv/${id}`, {}, CACHE_TTL_SECONDS.detail, toTvDetail),
+      detail: ({ id, language }: MediaInput) =>
+        request<RawTvDetail, TmdbTvDetail>(
+          `/tv/${id}`,
+          { language },
+          CACHE_TTL_SECONDS.detail,
+          toTvDetail,
+        ),
 
-      images: ({ id }: MediaInput) =>
-        request<RawImages, TmdbImages>(`/tv/${id}/images`, {}, CACHE_TTL_SECONDS.images, toImages),
+      images: ({ id, language }: MediaInput) =>
+        request<RawImages, TmdbImages>(
+          `/tv/${id}/images`,
+          { language },
+          CACHE_TTL_SECONDS.images,
+          toImages,
+        ),
 
-      season: ({ id, seasonNumber }: SeasonInput) =>
+      onTheAir: ({ language, page }: PageInput) =>
+        request<RawPage, TmdbMediaPage>(
+          "/tv/on_the_air",
+          { language, page: page ?? 1 },
+          CACHE_TTL_SECONDS.discover,
+          (raw) => toMediaPage(raw, "tv"),
+        ),
+
+      season: ({ id, language, seasonNumber }: SeasonInput) =>
         request<RawSeasonDetail, TmdbSeasonDetail>(
           `/tv/${id}/season/${seasonNumber}`,
-          {},
+          { language },
           CACHE_TTL_SECONDS.season,
           toSeasonDetail,
         ),
 
-      watchProviders: ({ id, region = DEFAULT_REGION }: WatchProvidersInput) =>
+      watchProviders: ({ id, language, region = DEFAULT_REGION }: MediaInput) =>
         request<RawWatchProviders, TmdbWatchProviders>(
           `/tv/${id}/watch/providers`,
-          {},
+          { language },
           CACHE_TTL_SECONDS.watchProviders,
           (raw) => toWatchProviders(raw, region),
         ),
