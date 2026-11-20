@@ -7,7 +7,7 @@ export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
-  routerContext: EntryContext
+  routerContext: EntryContext,
 ) {
   let statusCode = responseStatusCode;
   const body = await renderToReadableStream(
@@ -18,7 +18,7 @@ export default async function handleRequest(
         console.error(error);
       },
       signal: request.signal,
-    }
+    },
   );
 
   if (isbot(request.headers.get("user-agent") ?? "")) {

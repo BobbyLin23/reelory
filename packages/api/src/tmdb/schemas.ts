@@ -179,7 +179,7 @@ export const creditsSchema = z.object({
       name: z.string(),
       order: z.number().int(),
       profilePath: imagePath,
-    })
+    }),
   ),
   crew: z.array(
     z.object({
@@ -188,7 +188,7 @@ export const creditsSchema = z.object({
       job: z.string(),
       name: z.string(),
       profilePath: imagePath,
-    })
+    }),
   ),
   id: tmdbId,
 });

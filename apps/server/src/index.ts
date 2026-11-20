@@ -39,7 +39,7 @@ app.use("*", (c, next) =>
     credentials: true,
     maxAge: 86400,
     origin: c.env.CORS_ORIGIN,
-  })(c, next)
+  })(c, next),
 );
 
 app.get("/", (c) => c.text("OK"));

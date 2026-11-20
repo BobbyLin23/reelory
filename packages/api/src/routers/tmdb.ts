@@ -40,9 +40,7 @@ export const tmdbRouter = {
     watchProviders: publicProcedure
       .input(idInput.extend({ region: regionSchema }))
       .output(watchProvidersSchema)
-      .handler(({ input, context }) =>
-        context.tmdb.movie.watchProviders(input)
-      ),
+      .handler(({ input, context }) => context.tmdb.movie.watchProviders(input)),
   },
 
   search: publicProcedure
@@ -50,7 +48,7 @@ export const tmdbRouter = {
       z.object({
         page: pageSchema,
         query: z.string().trim().min(1).max(200),
-      })
+      }),
     )
     .output(mediaPageSchema)
     .handler(({ input, context }) => context.tmdb.search(input)),
@@ -61,7 +59,7 @@ export const tmdbRouter = {
         mediaType: z.enum(["all", "movie", "tv"]).default("all"),
         page: pageSchema,
         window: z.enum(["day", "week"]).default("week"),
-      })
+      }),
     )
     .output(mediaPageSchema)
     .handler(({ input, context }) => context.tmdb.trending(input)),

@@ -35,11 +35,7 @@ const CACHE_TTL_SECONDS = {
  */
 export interface TmdbCache {
   get: (key: string) => Promise<string | null>;
-  put: (
-    key: string,
-    value: string,
-    options: { expirationTtl: number }
-  ) => Promise<void>;
+  put: (key: string, value: string, options: { expirationTtl: number }) => Promise<void>;
 }
 
 export interface TmdbClientOptions {
@@ -255,7 +251,7 @@ const toNamedList = (items: RawNamed[] | undefined): NamedEntity[] =>
   (items ?? []).map((item) => ({ id: item.id ?? 0, name: item.name ?? "" }));
 
 const toCollection = (
-  collection: RawMovieDetail["belongs_to_collection"]
+  collection: RawMovieDetail["belongs_to_collection"],
 ): TmdbMovieDetail["belongsToCollection"] =>
   collection
     ? {
@@ -274,17 +270,13 @@ const toCompanyList = (companies: RawCompany[] | undefined) =>
     originCountry: company.origin_country ?? null,
   }));
 
-const toLanguageList = (
-  languages: { code?: string; name?: string }[] | undefined
-) =>
+const toLanguageList = (languages: { code?: string; name?: string }[] | undefined) =>
   (languages ?? []).map((language) => ({
     code: language.code ?? "",
     name: language.name ?? "",
   }));
 
-const toCountryList = (
-  countries: { iso_3166_1?: string; name?: string }[] | undefined
-) =>
+const toCountryList = (countries: { iso_3166_1?: string; name?: string }[] | undefined) =>
   (countries ?? []).map((country) => ({
     code: country.iso_3166_1 ?? "",
     name: country.name ?? "",
@@ -328,7 +320,7 @@ const toPersonSummary = (raw: RawMediaSummary): TmdbMediaSummary => ({
 
 const toMediaSummary = (
   raw: RawMediaSummary,
-  fallbackMediaType?: "movie" | "tv"
+  fallbackMediaType?: "movie" | "tv",
 ): TmdbMediaSummary | null => {
   switch (raw.media_type ?? fallbackMediaType) {
     case "movie": {
@@ -346,10 +338,7 @@ const toMediaSummary = (
   }
 };
 
-const toMediaPage = (
-  raw: RawPage,
-  fallbackMediaType?: "movie" | "tv"
-): TmdbMediaPage => ({
+const toMediaPage = (raw: RawPage, fallbackMediaType?: "movie" | "tv"): TmdbMediaPage => ({
   page: raw.page ?? 1,
   results: (raw.results ?? []).flatMap((item) => {
     const summary = toMediaSummary(item, fallbackMediaType);
@@ -483,13 +472,9 @@ const toProvider = (provider: RawProvider) => ({
   providerName: provider.provider_name ?? "",
 });
 
-const toProviders = (providers: RawProvider[] | undefined) =>
-  (providers ?? []).map(toProvider);
+const toProviders = (providers: RawProvider[] | undefined) => (providers ?? []).map(toProvider);
 
-const toWatchProviders = (
-  raw: RawWatchProviders,
-  region: string
-): TmdbWatchProviders => {
+const toWatchProviders = (raw: RawWatchProviders, region: string): TmdbWatchProviders => {
   const group = raw.results?.[region];
 
   return {
@@ -517,7 +502,7 @@ export const createTmdbClient = ({
     path: string,
     params: Record<string, string | number | undefined>,
     ttlSeconds: number,
-    map: (raw: Raw) => Result
+    map: (raw: Raw) => Result,
   ): Promise<Result> => {
     if (!apiKey) {
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
@@ -580,7 +565,7 @@ export const createTmdbClient = ({
           `/movie/${id}/credits`,
           {},
           CACHE_TTL_SECONDS.credits,
-          toCredits
+          toCredits,
         ),
 
       detail: ({ id }: MediaInput) =>
@@ -588,7 +573,7 @@ export const createTmdbClient = ({
           `/movie/${id}`,
           {},
           CACHE_TTL_SECONDS.detail,
-          toMovieDetail
+          toMovieDetail,
         ),
 
       images: ({ id }: MediaInput) =>
@@ -596,7 +581,7 @@ export const createTmdbClient = ({
           `/movie/${id}/images`,
           {},
           CACHE_TTL_SECONDS.images,
-          toImages
+          toImages,
         ),
 
       watchProviders: ({ id, region = DEFAULT_REGION }: WatchProvidersInput) =>
@@ -604,7 +589,7 @@ export const createTmdbClient = ({
           `/movie/${id}/watch/providers`,
           {},
           CACHE_TTL_SECONDS.watchProviders,
-          (raw) => toWatchProviders(raw, region)
+          (raw) => toWatchProviders(raw, region),
         ),
     },
 
@@ -613,7 +598,7 @@ export const createTmdbClient = ({
         "/search/multi",
         { include_adult: "false", page: page ?? 1, query },
         CACHE_TTL_SECONDS.search,
-        (raw) => toMediaPage(raw)
+        (raw) => toMediaPage(raw),
       ),
 
     trending: ({ mediaType, window, page }: TrendingInput) =>
@@ -621,7 +606,7 @@ export const createTmdbClient = ({
         `/trending/${mediaType}`,
         { page: page ?? 1, window },
         CACHE_TTL_SECONDS.trending,
-        (raw) => toMediaPage(raw, mediaType === "all" ? undefined : mediaType)
+        (raw) => toMediaPage(raw, mediaType === "all" ? undefined : mediaType),
       ),
 
     tv: {
@@ -630,31 +615,21 @@ export const createTmdbClient = ({
           `/tv/${id}/credits`,
           {},
           CACHE_TTL_SECONDS.credits,
-          toCredits
+          toCredits,
         ),
 
       detail: ({ id }: MediaInput) =>
-        request<RawTvDetail, TmdbTvDetail>(
-          `/tv/${id}`,
-          {},
-          CACHE_TTL_SECONDS.detail,
-          toTvDetail
-        ),
+        request<RawTvDetail, TmdbTvDetail>(`/tv/${id}`, {}, CACHE_TTL_SECONDS.detail, toTvDetail),
 
       images: ({ id }: MediaInput) =>
-        request<RawImages, TmdbImages>(
-          `/tv/${id}/images`,
-          {},
-          CACHE_TTL_SECONDS.images,
-          toImages
-        ),
+        request<RawImages, TmdbImages>(`/tv/${id}/images`, {}, CACHE_TTL_SECONDS.images, toImages),
 
       season: ({ id, seasonNumber }: SeasonInput) =>
         request<RawSeasonDetail, TmdbSeasonDetail>(
           `/tv/${id}/season/${seasonNumber}`,
           {},
           CACHE_TTL_SECONDS.season,
-          toSeasonDetail
+          toSeasonDetail,
         ),
 
       watchProviders: ({ id, region = DEFAULT_REGION }: WatchProvidersInput) =>
@@ -662,7 +637,7 @@ export const createTmdbClient = ({
           `/tv/${id}/watch/providers`,
           {},
           CACHE_TTL_SECONDS.watchProviders,
-          (raw) => toWatchProviders(raw, region)
+          (raw) => toWatchProviders(raw, region),
         ),
     },
   };

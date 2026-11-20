@@ -3,10 +3,7 @@ import type { Context as ApiContext } from "@reelory/api/context";
 import { createTmdbClient } from "@reelory/api/tmdb/client";
 import { createDb } from "@reelory/db";
 
-export async function createContext(
-  request: Request,
-  env: Env
-): Promise<ApiContext> {
+export async function createContext(request: Request, env: Env): Promise<ApiContext> {
   const clerk = createClerkClient({
     publishableKey: env.CLERK_PUBLISHABLE_KEY,
     secretKey: env.CLERK_SECRET_KEY,

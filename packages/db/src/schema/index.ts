@@ -1,12 +1,5 @@
 import { sql } from "drizzle-orm";
-import {
-  check,
-  index,
-  integer,
-  sqliteTable,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const MEDIA_TYPES = ["movie", "tv"] as const;
 
@@ -24,10 +17,7 @@ export const libraryEntries = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .notNull()
       .$defaultFn(() => new Date()),
-    genres: text("genres", { mode: "json" })
-      .$type<string[]>()
-      .notNull()
-      .default([]),
+    genres: text("genres", { mode: "json" }).$type<string[]>().notNull().default([]),
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
@@ -46,18 +36,12 @@ export const libraryEntries = sqliteTable(
     uniqueIndex("library_entries_user_title_unique").on(
       table.userId,
       table.tmdbId,
-      table.mediaType
+      table.mediaType,
     ),
     index("library_entries_user_status_idx").on(table.userId, table.status),
-    check(
-      "library_entries_media_type_check",
-      sql`${table.mediaType} in ('movie', 'tv')`
-    ),
-    check(
-      "library_entries_status_check",
-      sql`${table.status} in ('want', 'watching', 'watched')`
-    ),
-  ]
+    check("library_entries_media_type_check", sql`${table.mediaType} in ('movie', 'tv')`),
+    check("library_entries_status_check", sql`${table.status} in ('want', 'watching', 'watched')`),
+  ],
 );
 
 // One row per watch, so a second row is a rewatch (no rewatch flag) and each
@@ -83,16 +67,10 @@ export const watchEntries = sqliteTable(
     watchedOn: text("watched_on"),
   },
   (table) => [
-    index("watch_entries_user_watched_on_idx").on(
-      table.userId,
-      table.watchedOn
-    ),
-    check(
-      "watch_entries_media_type_check",
-      sql`${table.mediaType} in ('movie', 'tv')`
-    ),
+    index("watch_entries_user_watched_on_idx").on(table.userId, table.watchedOn),
+    check("watch_entries_media_type_check", sql`${table.mediaType} in ('movie', 'tv')`),
     check("watch_entries_rating_check", sql`${table.rating} between 1 and 10`),
-  ]
+  ],
 );
 
 export const lists = sqliteTable(
@@ -108,7 +86,7 @@ export const lists = sqliteTable(
     name: text("name").notNull(),
     userId: text("user_id").notNull(),
   },
-  (table) => [index("lists_user_id_idx").on(table.userId)]
+  (table) => [index("lists_user_id_idx").on(table.userId)],
 );
 
 export const listItems = sqliteTable(
@@ -128,17 +106,10 @@ export const listItems = sqliteTable(
     tmdbId: integer("tmdb_id").notNull(),
   },
   (table) => [
-    uniqueIndex("list_items_list_title_unique").on(
-      table.listId,
-      table.tmdbId,
-      table.mediaType
-    ),
+    uniqueIndex("list_items_list_title_unique").on(table.listId, table.tmdbId, table.mediaType),
     index("list_items_list_position_idx").on(table.listId, table.position),
-    check(
-      "list_items_media_type_check",
-      sql`${table.mediaType} in ('movie', 'tv')`
-    ),
-  ]
+    check("list_items_media_type_check", sql`${table.mediaType} in ('movie', 'tv')`),
+  ],
 );
 
 export type LibraryEntry = typeof libraryEntries.$inferSelect;
