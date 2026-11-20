@@ -21,6 +21,15 @@ jobs:
         with:
           bun-version-file: package.json
 
+      # Bun's global install cache, keyed by the lockfile: a hit still installs
+      # exactly what bun.lock pins, it just skips downloading the tarballs.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
       - run: bun install --frozen-lockfile
 
       # Formatting, lint, then every package's type check.
