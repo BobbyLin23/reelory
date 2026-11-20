@@ -73,6 +73,35 @@ export const starsToRating = (stars: number): number | null => {
 
 export const ratingToStars = (rating: number | null): number => (rating === null ? 0 : rating / 2);
 
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+export const formatWatchDate = (value: string | null): string | null => {
+  if (value === null) {
+    return null;
+  }
+  const date = fromIsoDate(value);
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+};
+
+/** A 1-10 rating as the half-star value people see, without a trailing zero. */
+export const formatStars = (rating: number): string => {
+  const stars = ratingToStars(rating);
+  return Number.isInteger(stars) ? String(stars) : stars.toFixed(1);
+};
+
 export const librarySnapshot = ({
   genres,
   posterPath,

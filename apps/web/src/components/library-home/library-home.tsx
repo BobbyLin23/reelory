@@ -1,19 +1,243 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Star } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import type { Segment } from "@/components/arc/segmented-control/segmented-control";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { PageIntro } from "@/components/page-intro";
-import { libraryStatusLabel, tmdbImageUrl } from "@/utils/media";
+import type { LibraryStatus, MediaType } from "@/utils/media";
+import {
+  LIBRARY_STATUS_ACTIONS,
+  formatStars,
+  formatWatchDate,
+  tmdbImageUrl,
+  toIsoDate,
+} from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
 import styles from "./library-home.module.css";
 
+interface LibraryItem {
+  id: string;
+  latestWatch: { rating: number | null; watchedOn: string | null } | null;
+  mediaType: MediaType;
+  posterPath: string | null;
+  progress: { episode: number; season: number } | null;
+  status: LibraryStatus;
+  title: string;
+  tmdbId: number;
+  year: number | null;
+}
+
+type LibraryView = "grid" | "list";
+
+const VIEW_KEY = "reelory.library.view";
+const VIEW_OPTIONS: Segment[] = [
+  { label: "Grid", value: "grid" },
+  { label: "List", value: "list" },
+];
+const KIND_LABEL: Record<MediaType, string> = { movie: "Film", tv: "Series" };
+const EMPTY_STATES: Record<LibraryStatus, { description: string; title: string }> = {
+  want: {
+    description: "Titles you want to watch appear here. Open a title and choose Want.",
+    title: "Nothing in Want yet",
+  },
+  watching: {
+    description:
+      "Open a title and choose Watching. Series progress appears here as you log episodes.",
+    title: "Nothing in Watching yet",
+  },
+  watched: {
+    description: "Open a title and log a watch. It appears here with its date and rating.",
+    title: "Nothing watched yet",
+  },
+};
+
+const isView = (value: string | null): value is LibraryView => value === "grid" || value === "list";
+
+const isStatus = (value: string): value is LibraryStatus =>
+  LIBRARY_STATUS_ACTIONS.some((action) => action.status === value);
+
+/** Storage can be unavailable in a private window, so a failed read only means the default view. */
+const readView = (): LibraryView | null => {
+  try {
+    const value = window.localStorage.getItem(VIEW_KEY);
+    return isView(value) ? value : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveView = (view: LibraryView) => {
+  try {
+    window.localStorage.setItem(VIEW_KEY, view);
+  } catch {
+    // The toggle still works for this visit.
+  }
+};
+
+const titlePath = (entry: LibraryItem) => `/title/${entry.mediaType}/${entry.tmdbId}`;
+
+const Poster = ({
+  className,
+  path,
+  size,
+}: {
+  className: string;
+  path: string | null;
+  size: "w185" | "w500";
+}) => {
+  const src = tmdbImageUrl(path, size);
+  return (
+    <div aria-hidden="true" className={className}>
+      {src === null ? null : <img alt="" src={src} />}
+    </div>
+  );
+};
+
+const WatchMeta = ({ watch }: { watch: LibraryItem["latestWatch"] }) => {
+  if (watch === null || (watch.rating === null && watch.watchedOn === null)) {
+    return null;
+  }
+  const date = formatWatchDate(watch.watchedOn);
+  const rating = watch.rating === null ? null : formatStars(watch.rating);
+  return (
+    <p className={styles.meta}>
+      <span aria-hidden="true" className={styles.watchMeta}>
+        {date}
+        {date !== null && rating !== null ? <span>·</span> : null}
+        {rating === null ? null : (
+          <span className={styles.rating}>
+            <Star className={styles.star} fill="currentColor" size={12} strokeWidth={0} />
+            {rating}
+          </span>
+        )}
+      </span>
+      <span className={styles.srOnly}>
+        {[date, rating === null ? null : `Rated ${rating} out of 5`].filter(Boolean).join(", ")}
+      </span>
+    </p>
+  );
+};
+
+const PosterGrid = ({ entries }: { entries: LibraryItem[] }) => (
+  <ul className={styles.grid}>
+    {entries.map((entry) => (
+      <li key={entry.id}>
+        <Link className={styles.card} to={titlePath(entry)}>
+          <Poster className={styles.cardPoster} path={entry.posterPath} size="w500" />
+          <div className={styles.cardCopy}>
+            <p className={styles.cardTitle}>{entry.title}</p>
+            <p className={styles.meta}>
+              {entry.year ?? "No year"} · {KIND_LABEL[entry.mediaType]}
+            </p>
+            <WatchMeta watch={entry.latestWatch} />
+          </div>
+        </Link>
+      </li>
+    ))}
+  </ul>
+);
+
+const DenseList = ({ entries }: { entries: LibraryItem[] }) => (
+  <ul className={styles.list}>
+    {entries.map((entry) => (
+      <li key={entry.id}>
+        <Link className={styles.row} to={titlePath(entry)}>
+          <Poster className={styles.poster} path={entry.posterPath} size="w185" />
+          <div className={styles.copy}>
+            <p className={styles.cardTitle}>{entry.title}</p>
+            <p className={styles.meta}>
+              {entry.year ?? "No year"} · {KIND_LABEL[entry.mediaType]}
+            </p>
+            <WatchMeta watch={entry.latestWatch} />
+          </div>
+        </Link>
+      </li>
+    ))}
+  </ul>
+);
+
+const ContinueWatching = ({
+  entries,
+  onAdvance,
+  pendingKey,
+  saveError,
+}: {
+  entries: LibraryItem[];
+  onAdvance: (entry: LibraryItem) => void;
+  pendingKey: string | null;
+  saveError: boolean;
+}) => (
+  <section aria-labelledby="continue-watching" className={styles.railSection}>
+    <div className={styles.railHeader}>
+      <h2 className={styles.railHeading} id="continue-watching">
+        Continue watching
+      </h2>
+      <p className={styles.railHint}>One tap marks the next episode watched.</p>
+    </div>
+    {saveError ? (
+      <p className={styles.error} role="alert">
+        We could not save that episode. Check your connection and try again.
+      </p>
+    ) : null}
+    <ul className={styles.rail}>
+      {entries.map((entry) => {
+        const progress = entry.progress;
+        if (progress === null) {
+          return null;
+        }
+        const next = `S${progress.season}E${progress.episode + 1}`;
+        return (
+          <li className={styles.railItem} key={entry.id}>
+            <Link className={styles.railLink} to={titlePath(entry)}>
+              <Poster className={styles.railPoster} path={entry.posterPath} size="w185" />
+              <span className={styles.railCopy}>
+                <span className={styles.cardTitle}>{entry.title}</span>
+                <span className={styles.railProgress}>
+                  Watched through S{progress.season}E{progress.episode}
+                </span>
+              </span>
+            </Link>
+            <Button
+              className={styles.railAction}
+              loading={pendingKey === `${entry.mediaType}:${entry.tmdbId}`}
+              type="button"
+              variant="secondary"
+              onClick={() => onAdvance(entry)}
+            >
+              Mark {next} watched
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
+  </section>
+);
+
 export const LibraryHome = () => {
-  const libraryQuery = useQuery(orpc.library.list.queryOptions({ input: {} }));
+  const queryClient = useQueryClient();
+  const libraryQuery = useQuery(orpc.library.overview.queryOptions());
+  const [status, setStatus] = useState<LibraryStatus>("want");
+  const [view, setView] = useState<LibraryView>("grid");
+  const advance = useMutation({
+    ...orpc.watch.log.mutationOptions(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.library.overview.key() }),
+  });
+
+  // The saved view is applied after hydration so the server and first client render match.
+  useEffect(() => {
+    const saved = readView();
+    if (saved !== null) {
+      setView(saved);
+    }
+  }, []);
 
   if (libraryQuery.error) {
     return (
@@ -31,7 +255,41 @@ export const LibraryHome = () => {
     );
   }
 
-  const entries = libraryQuery.data ?? [];
+  const counts = libraryQuery.data?.counts ?? { want: 0, watched: 0, watching: 0 };
+  const entries = libraryQuery.data?.entries ?? [];
+  const visible = entries.filter((entry) => entry.status === status);
+  const railEntries =
+    status === "watching" ? visible.filter((entry) => entry.progress !== null) : [];
+  const statusOptions: Segment[] = LIBRARY_STATUS_ACTIONS.map(({ label, status: value }) => ({
+    accessory: <Badge size="sm">{counts[value]}</Badge>,
+    label,
+    value,
+  }));
+  const pendingKey =
+    advance.isPending && advance.variables
+      ? `${advance.variables.mediaType}:${advance.variables.tmdbId}`
+      : null;
+
+  const changeView = (value: string) => {
+    if (!isView(value)) {
+      return;
+    }
+    setView(value);
+    saveView(value);
+  };
+
+  const advanceEpisode = (entry: LibraryItem) => {
+    if (entry.progress === null) {
+      return;
+    }
+    advance.mutate({
+      episode: entry.progress.episode + 1,
+      mediaType: entry.mediaType,
+      season: entry.progress.season,
+      tmdbId: entry.tmdbId,
+      watchedOn: toIsoDate(new Date()),
+    });
+  };
 
   return (
     <div className={styles.page}>
@@ -39,36 +297,43 @@ export const LibraryHome = () => {
         description="Your library of films and series, and what to watch next."
         title="Home"
       />
-      <Skeleton label="Loading library" lines={4} loading={libraryQuery.isPending}>
-        {entries.length === 0 ? (
-          <EmptyState
-            description="Open a title and choose Want, Watching, or Watched. It appears here."
-            title="Nothing in your library yet"
-          />
-        ) : (
-          <ul className={styles.list}>
-            {entries.map((entry) => {
-              const poster = tmdbImageUrl(entry.posterPath, "w185");
-              return (
-                <li key={entry.id}>
-                  <Link className={styles.row} to={`/title/${entry.mediaType}/${entry.tmdbId}`}>
-                    <div className={styles.poster}>
-                      {poster === null ? null : <img alt="" src={poster} />}
-                    </div>
-                    <div className={styles.copy}>
-                      <p className={styles.title}>{entry.title}</p>
-                      <p className={styles.meta}>
-                        {entry.year ?? "No year"}
-                        {entry.mediaType === "tv" ? " · Series" : " · Film"}
-                      </p>
-                    </div>
-                    <Badge pill>{libraryStatusLabel(entry.status)}</Badge>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+      <Skeleton label="Loading your library" lines={6} loading={libraryQuery.isPending}>
+        <div className={styles.library}>
+          <div className={styles.controls}>
+            <SegmentedControl
+              label="Library status"
+              options={statusOptions}
+              value={status}
+              onValueChange={(value) => {
+                if (isStatus(value)) {
+                  setStatus(value);
+                }
+              }}
+            />
+            <SegmentedControl
+              className={styles.viewControl}
+              label="Library view"
+              options={VIEW_OPTIONS}
+              value={view}
+              onValueChange={changeView}
+            />
+          </div>
+          {railEntries.length === 0 ? null : (
+            <ContinueWatching
+              entries={railEntries}
+              pendingKey={pendingKey}
+              saveError={advance.isError}
+              onAdvance={advanceEpisode}
+            />
+          )}
+          {visible.length === 0 ? (
+            <EmptyState {...EMPTY_STATES[status]} />
+          ) : view === "grid" ? (
+            <PosterGrid entries={visible} />
+          ) : (
+            <DenseList entries={visible} />
+          )}
+        </div>
       </Skeleton>
     </div>
   );

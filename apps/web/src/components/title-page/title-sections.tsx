@@ -5,12 +5,11 @@ import { Button } from "@/components/arc/button/button";
 import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Rating } from "@/components/arc/rating/rating";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
-import { fromIsoDate, ratingToStars, tmdbImageUrl, yearFromDate } from "@/utils/media";
+import { formatWatchDate, ratingToStars, tmdbImageUrl, yearFromDate } from "@/utils/media";
 
 import styles from "./title-page.module.css";
 
 const CAST_LIMIT = 12;
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export interface WatchLog {
   episode: number | null;
@@ -20,14 +19,6 @@ export interface WatchLog {
   season: number | null;
   watchedOn: string | null;
 }
-
-const formatWatchDate = (value: string | null) => {
-  if (value === null) {
-    return "Unknown date";
-  }
-  const date = fromIsoDate(value);
-  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-};
 
 export const CastSection = ({
   credits,
@@ -121,7 +112,9 @@ export const WatchesSection = ({
             <li className={styles.log} key={watch.id}>
               <div className={styles.logHeader}>
                 <div className={styles.logMeta}>
-                  <p className={styles.logDate}>{formatWatchDate(watch.watchedOn)}</p>
+                  <p className={styles.logDate}>
+                    {formatWatchDate(watch.watchedOn) ?? "Unknown date"}
+                  </p>
                   {watch.season === null || watch.episode === null ? null : (
                     <p className={styles.logEpisode}>
                       Season {watch.season}, episode {watch.episode}

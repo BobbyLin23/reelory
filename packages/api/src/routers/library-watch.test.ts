@@ -68,6 +68,7 @@ test("rejects unauthenticated requests to every new procedure", async () => {
   const id = crypto.randomUUID();
   const requests = [
     anonymous.library.list(),
+    anonymous.library.overview(),
     anonymous.library.setStatus({ ...tv, snapshot, status: "watching" }),
     anonymous.watch.list(tv),
     anonymous.watch.log(tv),
@@ -102,6 +103,58 @@ test("upserts one localized library snapshot per user and title, then filters an
   expect(await alice.library.list({ status: "watching" })).toHaveLength(2);
   expect(await bob.library.list()).toEqual([otherUser]);
   expect(updated).toMatchObject(snapshot);
+});
+
+test("summarizes counts, the latest watch, and the furthest episode per title", async () => {
+  const alice = rpc("overview-alice");
+  const bob = rpc("overview-bob");
+  const series = { mediaType: "tv", tmdbId: 8 } as const;
+  const film = { mediaType: "movie", tmdbId: 9 } as const;
+  const queued = { mediaType: "movie", tmdbId: 10 } as const;
+
+  await alice.library.setStatus({
+    ...queued,
+    snapshot: { ...snapshot, title: "Queued" },
+    status: "want",
+  });
+  await alice.library.setStatus({
+    ...film,
+    snapshot: { ...snapshot, title: "Film" },
+    status: "watched",
+  });
+  await alice.library.setStatus({
+    ...series,
+    snapshot: { ...snapshot, title: "Series" },
+    status: "watching",
+  });
+  await bob.library.setStatus({ ...series, snapshot, status: "want" });
+
+  await alice.watch.log({ ...series, episode: 2, rating: 6, season: 1, watchedOn: "2026-11-01" });
+  await alice.watch.log({ ...series, episode: 1, rating: 8, season: 2, watchedOn: "2026-11-10" });
+  // A backfilled earlier episode is the furthest progress even though a later watch holds the date.
+  await alice.watch.log({ ...series, episode: 4, rating: 4, season: 1, watchedOn: "2026-11-05" });
+  await alice.watch.log({ ...film, rating: 9, watchedOn: null });
+  await bob.watch.log({ ...series, episode: 9, season: 9 });
+
+  const overview = await alice.library.overview();
+  expect(overview.counts).toEqual({ want: 1, watched: 1, watching: 1 });
+  expect(overview.entries.map(({ id }) => id)).toEqual(
+    (await alice.library.list()).map(({ id }) => id),
+  );
+  const byTitle = new Map(overview.entries.map((entry) => [entry.title, entry]));
+  expect(byTitle.get("Series")).toMatchObject({
+    latestWatch: { rating: 8, watchedOn: "2026-11-10" },
+    progress: { episode: 1, season: 2 },
+  });
+  expect(byTitle.get("Film")).toMatchObject({
+    latestWatch: { rating: 9, watchedOn: null },
+    progress: null,
+  });
+  expect(byTitle.get("Queued")).toMatchObject({ latestWatch: null, progress: null });
+  expect(await bob.library.overview()).toMatchObject({
+    counts: { want: 1, watched: 0, watching: 0 },
+    entries: [{ progress: { episode: 9, season: 9 } }],
+  });
 });
 
 test("logs rewatches independently and lets only the owner edit or delete a watch", async () => {
