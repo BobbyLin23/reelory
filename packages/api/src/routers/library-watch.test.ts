@@ -69,6 +69,7 @@ test("rejects unauthenticated requests to every new procedure", async () => {
   const requests = [
     anonymous.library.list(),
     anonymous.library.setStatus({ ...tv, snapshot, status: "watching" }),
+    anonymous.watch.list(tv),
     anonymous.watch.log(tv),
     anonymous.watch.update({ id, review: "Private" }),
     anonymous.watch.delete({ id }),
@@ -96,6 +97,7 @@ test("upserts one localized library snapshot per user and title, then filters an
   expect(entries.map(({ id }) => id)).toEqual([updated.id, otherType.id]);
   expect(await alice.library.list({ mediaType: "tv", status: "watching" })).toEqual([updated]);
   expect(await alice.library.list({ mediaType: "tv", status: "watched" })).toEqual([]);
+  expect(await alice.library.list({ mediaType: "tv", tmdbId: tv.tmdbId })).toEqual([updated]);
   expect(await alice.library.list({ mediaType: "movie" })).toEqual([otherType]);
   expect(await alice.library.list({ status: "watching" })).toHaveLength(2);
   expect(await bob.library.list()).toEqual([otherUser]);
@@ -114,6 +116,10 @@ test("logs rewatches independently and lets only the owner edit or delete a watc
   expect(watch).toMatchObject(fields);
   expect(rewatch.id).not.toBe(watch.id);
   expect(rewatch.watchedOn).toBe("2024-02-29");
+  const aliceWatches = await alice.watch.list(tv);
+  expect(aliceWatches.map(({ id }) => id)).toEqual([rewatch.id, watch.id]);
+  expect(await alice.watch.list(movie)).toEqual([]);
+  expect(await bob.watch.list(tv)).toEqual([]);
   expect(unknown).toMatchObject({
     episode: null,
     rating: null,

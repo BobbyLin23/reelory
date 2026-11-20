@@ -22,7 +22,11 @@ export const libraryRouter = {
   list: protectedProcedure
     .input(
       z
-        .object({ mediaType: titleKey.shape.mediaType.optional(), status: status.optional() })
+        .object({
+          mediaType: titleKey.shape.mediaType.optional(),
+          status: status.optional(),
+          tmdbId: titleKey.shape.tmdbId.optional(),
+        })
         .default({}),
     )
     .handler(({ context, input }) =>
@@ -34,6 +38,7 @@ export const libraryRouter = {
             eq(libraryEntries.userId, context.auth.userId),
             input.status ? eq(libraryEntries.status, input.status) : undefined,
             input.mediaType ? eq(libraryEntries.mediaType, input.mediaType) : undefined,
+            input.tmdbId ? eq(libraryEntries.tmdbId, input.tmdbId) : undefined,
           ),
         )
         .orderBy(

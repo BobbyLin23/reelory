@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { watchEntries } from "@reelory/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
@@ -34,6 +34,20 @@ export const watchRouter = {
       }
       return deleted;
     }),
+
+  list: protectedProcedure.input(titleKey).handler(({ context, input }) =>
+    context.db
+      .select()
+      .from(watchEntries)
+      .where(
+        and(
+          eq(watchEntries.userId, context.auth.userId),
+          eq(watchEntries.tmdbId, input.tmdbId),
+          eq(watchEntries.mediaType, input.mediaType),
+        ),
+      )
+      .orderBy(desc(watchEntries.watchedOn), desc(watchEntries.createdAt), desc(watchEntries.id)),
+  ),
 
   log: protectedProcedure
     .input(
