@@ -1,0 +1,34 @@
+name: CI
+
+on: push
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - run: bun install --frozen-lockfile
+
+      # Formatting, lint, then every package's type check.
+      - run: bun run check
+        env:
+          # `react-router typegen` loads the web env through varlock, which
+          # requires these to be set. Type checking never calls either service,
+          # so placeholder values are enough.
+          VITE_SERVER_URL: http://localhost:3058
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+          CLERK_SECRET_KEY: sk_test_placeholder
