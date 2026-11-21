@@ -1,7 +1,6 @@
-import { PageIntro } from "@/components/page-intro";
+import { Outlet } from "react-router";
 
-export const meta = () => [{ title: "Lists · reelory" }];
+/** The Lists tab and a single list share the page width, so this level only passes through. */
+const ListsLayout = () => <Outlet />;
 
-export default function Lists() {
-  return <PageIntro title="Lists" description="Collections you build and share." />;
-}
+export default ListsLayout;

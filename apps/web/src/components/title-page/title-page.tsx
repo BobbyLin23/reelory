@@ -1,8 +1,11 @@
+import { useState } from "react";
+
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { ExpandableText } from "@/components/arc/expandable-text/expandable-text";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { AddToListDialog } from "@/components/lists/add-to-list-dialog";
 import type { LibraryStatus } from "@/utils/media";
 import { LIBRARY_STATUS_ACTIONS, formatVote, libraryStatusLabel } from "@/utils/media";
 
@@ -22,6 +25,7 @@ const TitleHero = ({
   backdropUrl,
   genres,
   libraryStatus,
+  onAddToList,
   onLog,
   onStatus,
   overview,
@@ -35,6 +39,7 @@ const TitleHero = ({
   backdropUrl: string | null;
   genres: readonly { id: number; name: string }[];
   libraryStatus: LibraryStatus | undefined;
+  onAddToList: () => void;
   onLog: () => void;
   onStatus: (status: LibraryStatus) => void;
   overview: string;
@@ -86,6 +91,9 @@ const TitleHero = ({
         <Button type="button" onClick={onLog}>
           Log a watch
         </Button>
+        <Button type="button" variant="secondary" onClick={onAddToList}>
+          Add to list
+        </Button>
       </div>
       {statusError === null ? null : (
         <p className={styles.error} role="alert">
@@ -125,6 +133,7 @@ const TitleError = ({ error, onRetry }: { error: unknown; onRetry: () => Promise
 
 export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
   const page = useTitlePage(mediaType, tmdbId);
+  const [listOpen, setListOpen] = useState(false);
 
   if (page.detailError) {
     return <TitleError error={page.detailError} onRetry={page.handleRetryDetail} />;
@@ -145,6 +154,9 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
             title={page.title}
             voteAverage={page.voteAverage}
             year={page.year}
+            onAddToList={() => {
+              setListOpen(true);
+            }}
             onLog={() => {
               page.setEditingId(null);
               page.setLogOpen(true);
@@ -171,6 +183,12 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
           page.setEditingId(id);
           page.setLogOpen(true);
         }}
+      />
+      <AddToListDialog
+        mediaType={mediaType}
+        open={listOpen}
+        tmdbId={tmdbId}
+        onOpenChange={setListOpen}
       />
       <LogSheet
         entry={page.editing}
