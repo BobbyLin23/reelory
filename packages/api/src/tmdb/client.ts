@@ -643,8 +643,8 @@ export const createTmdbClient = ({
 
     trending: ({ language, mediaType, page, window }: TrendingInput) =>
       request<RawPage, TmdbMediaPage>(
-        `/trending/${mediaType}`,
-        { language, page: page ?? 1, window },
+        `/trending/${mediaType}/${window}`,
+        { language, page: page ?? 1 },
         CACHE_TTL_SECONDS.trending,
         (raw) => toMediaPage(raw, mediaType === "all" ? undefined : mediaType),
       ),

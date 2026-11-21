@@ -131,6 +131,14 @@ test("serves paged Discover feeds and localized genre lists through RPC", async 
     page: 1,
     results: [{ mediaType: "tv", name: "电视节目" }],
   });
+  // Trending keeps the window in the path; TMDB treats `?window=` as a 404.
+  expect(await rpc.trending({ ...cn, mediaType: "all", window: "day" })).toMatchObject({
+    page: 1,
+  });
+  expect(await rpc.trending({ mediaType: "movie", window: "week" })).toMatchObject({
+    page: 1,
+    results: [{ mediaType: "movie" }],
+  });
   expect(await rpc.genres.movie(cn)).toEqual([{ id: 18, name: "剧情" }]);
   expect(await rpc.genres.tv()).toEqual([{ id: 18, name: "Drama" }]);
   expect(requests.map((url) => url.pathname)).toEqual([
@@ -138,6 +146,8 @@ test("serves paged Discover feeds and localized genre lists through RPC", async 
     "/3/movie/upcoming",
     "/3/movie/now_playing",
     "/3/tv/on_the_air",
+    "/3/trending/all/day",
+    "/3/trending/movie/week",
     "/3/genre/movie/list",
     "/3/genre/tv/list",
   ]);
