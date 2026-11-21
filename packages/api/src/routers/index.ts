@@ -3,6 +3,7 @@ import type { RouterClient } from "@orpc/server";
 import { protectedProcedure, publicProcedure } from "../index";
 import { libraryRouter } from "./library";
 import { preferencesRouter } from "./preferences";
+import { statsRouter } from "./stats";
 import { tmdbRouter } from "./tmdb";
 import { watchRouter } from "./watch";
 
@@ -14,6 +15,7 @@ export const appRouter = {
     message: "This is private",
     userId: context.auth.userId,
   })),
+  stats: statsRouter,
   tmdb: tmdbRouter,
   watch: watchRouter,
 };
