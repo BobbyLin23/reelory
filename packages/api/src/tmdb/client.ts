@@ -644,6 +644,14 @@ export const createTmdbClient = ({
           (raw) => toMediaPage(raw, "movie"),
         ),
 
+      topRated: ({ language, page, region = defaultRegion }: PageInput) =>
+        request<RawPage, TmdbMediaPage>(
+          "/movie/top_rated",
+          { language, page: page ?? 1, region },
+          CACHE_TTL_SECONDS.discover,
+          (raw) => toMediaPage(raw, "movie"),
+        ),
+
       upcoming: ({ language, page, region = defaultRegion }: PageInput) =>
         request<RawPage, TmdbMediaPage>(
           "/movie/upcoming",
@@ -716,6 +724,14 @@ export const createTmdbClient = ({
           { language },
           CACHE_TTL_SECONDS.season,
           toSeasonDetail,
+        ),
+
+      topRated: ({ language, page }: PageInput) =>
+        request<RawPage, TmdbMediaPage>(
+          "/tv/top_rated",
+          { language, page: page ?? 1 },
+          CACHE_TTL_SECONDS.discover,
+          (raw) => toMediaPage(raw, "tv"),
         ),
 
       watchProviders: ({ id, language, region = defaultRegion }: MediaInput) =>

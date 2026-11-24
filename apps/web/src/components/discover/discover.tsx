@@ -238,6 +238,8 @@ const Browse = () => {
       input: { mediaType: "all", window: "week" },
     }),
   );
+  const topFilms = useQuery(orpc.tmdb.movie.topRated.queryOptions({ input: {} }));
+  const topSeries = useQuery(orpc.tmdb.tv.topRated.queryOptions({ input: {} }));
   const upcoming = useQuery(orpc.tmdb.movie.upcoming.queryOptions({ input: {} }));
   const onTheAir = useQuery(orpc.tmdb.tv.onTheAir.queryOptions({ input: {} }));
 
@@ -256,6 +258,26 @@ const Browse = () => {
         title="Trending this week"
         onRetry={() => {
           trending.refetch();
+        }}
+      />
+      <Shelf
+        failed={topFilms.isError}
+        id="top-films"
+        pending={topFilms.isPending}
+        results={topFilms.data?.results ?? []}
+        title="Top rated films"
+        onRetry={() => {
+          topFilms.refetch();
+        }}
+      />
+      <Shelf
+        failed={topSeries.isError}
+        id="top-series"
+        pending={topSeries.isPending}
+        results={topSeries.data?.results ?? []}
+        title="Top rated series"
+        onRetry={() => {
+          topSeries.refetch();
         }}
       />
       <Shelf

@@ -50,6 +50,11 @@ export const tmdbRouter = {
       .output(mediaPageSchema)
       .handler(({ input, context }) => context.tmdb.movie.nowPlaying(input)),
 
+    topRated: publicProcedure
+      .input(pageInput.prefault({}))
+      .output(mediaPageSchema)
+      .handler(({ input, context }) => context.tmdb.movie.topRated(input)),
+
     upcoming: publicProcedure
       .input(pageInput.prefault({}))
       .output(mediaPageSchema)
@@ -101,6 +106,11 @@ export const tmdbRouter = {
       .input(idInput.extend({ seasonNumber: z.number().int().min(0).max(100) }))
       .output(seasonDetailSchema)
       .handler(({ input, context }) => context.tmdb.tv.season(input)),
+
+    topRated: publicProcedure
+      .input(pageInput.prefault({}))
+      .output(mediaPageSchema)
+      .handler(({ input, context }) => context.tmdb.tv.topRated(input)),
 
     watchProviders: publicProcedure
       .input(idInput)

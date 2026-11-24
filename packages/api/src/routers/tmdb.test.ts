@@ -98,12 +98,14 @@ test("returns series creators when TMDB provides them and an empty list otherwis
     id,
     name: "Series",
     ...(url.pathname.endsWith(`/${id}`)
-      ? { created_by: [{ id: 42, name: "Series creator", credit_id: "creator-credit" }] }
+      ? { created_by: [{ credit_id: "creator-credit", id: 42, name: "Series creator" }] }
       : {}),
   }));
 
-  expect((await rpc.tv.detail({ id })).createdBy).toEqual([{ id: 42, name: "Series creator" }]);
-  expect((await rpc.tv.detail({ id: id + 1 })).createdBy).toEqual([]);
+  const detail = await rpc.tv.detail({ id });
+  const missing = await rpc.tv.detail({ id: id + 1 });
+  expect(detail.createdBy).toEqual([{ id: 42, name: "Series creator" }]);
+  expect(missing.createdBy).toEqual([]);
 });
 
 test("selects the requested provider region on both cache misses and hits", async () => {
@@ -142,7 +144,13 @@ test("serves paged Discover feeds and localized genre lists through RPC", async 
     }
     return {
       page: Number(url.searchParams.get("page")),
-      results: [{ id, name: "电视节目", title: url.searchParams.get("region") }],
+      results: [
+        {
+          id,
+          name: "电视节目",
+          title: url.pathname.endsWith("/top_rated") ? "Top" : url.searchParams.get("region"),
+        },
+      ],
       total_pages: 8,
       total_results: 150,
     };
@@ -161,7 +169,17 @@ test("serves paged Discover feeds and localized genre lists through RPC", async 
     page: 1,
     results: [{ mediaType: "movie", title: "US" }],
   });
+  expect(await rpc.movie.topRated({ ...cn, page: 2 })).toMatchObject({
+    page: 2,
+    results: [{ mediaType: "movie", title: "Top" }],
+    totalPages: 8,
+    totalResults: 150,
+  });
   expect(await rpc.tv.onTheAir(cn)).toMatchObject({
+    page: 1,
+    results: [{ mediaType: "tv", name: "电视节目" }],
+  });
+  expect(await rpc.tv.topRated(cn)).toMatchObject({
     page: 1,
     results: [{ mediaType: "tv", name: "电视节目" }],
   });
@@ -179,7 +197,9 @@ test("serves paged Discover feeds and localized genre lists through RPC", async 
     "/3/movie/upcoming",
     "/3/movie/upcoming",
     "/3/movie/now_playing",
+    "/3/movie/top_rated",
     "/3/tv/on_the_air",
+    "/3/tv/top_rated",
     "/3/trending/all/day",
     "/3/trending/movie/week",
     "/3/genre/movie/list",
