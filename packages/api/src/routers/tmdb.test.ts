@@ -72,6 +72,27 @@ test("localizes movie titles without mixing caches or changing the default US re
   });
 });
 
+test("includes fallback poster art alongside the localized movie image catalog", async () => {
+  const { rpc } = setup((url) => ({
+    id,
+    posters: [
+      { file_path: "/chinese.jpg", iso_639_1: "zh" },
+      { file_path: "/english.jpg", iso_639_1: "en" },
+      { file_path: "/textless.jpg", iso_639_1: null },
+      { file_path: "/french.jpg", iso_639_1: "fr" },
+    ].filter(({ iso_639_1 }) =>
+      url.searchParams.get("include_image_language")?.split(",").includes(String(iso_639_1)),
+    ),
+  }));
+
+  const { posters } = await rpc.movie.images({ id, language: "zh-CN" });
+  expect(posters.map(({ filePath }) => filePath)).toEqual([
+    "/chinese.jpg",
+    "/english.jpg",
+    "/textless.jpg",
+  ]);
+});
+
 test("selects the requested provider region on both cache misses and hits", async () => {
   const { requests, rpc, ttls } = setup(() => ({
     id,

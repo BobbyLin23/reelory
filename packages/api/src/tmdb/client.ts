@@ -623,10 +623,13 @@ export const createTmdbClient = ({
           toMovieDetail,
         ),
 
-      images: ({ id, language }: MediaInput) =>
+      images: ({ id, language = defaultLanguage }: MediaInput) =>
         request<RawImages, TmdbImages>(
           `/movie/${id}/images`,
-          { language },
+          {
+            include_image_language: [...new Set([language.split("-")[0], "en", "null"])].join(","),
+            language,
+          },
           CACHE_TTL_SECONDS.images,
           toImages,
         ),

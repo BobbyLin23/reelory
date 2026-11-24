@@ -28,6 +28,9 @@ const useTitleQueries = (mediaType: "movie" | "tv", tmdbId: number) => {
   const watchesQuery = useQuery(orpc.watch.list.queryOptions({ input: { mediaType, tmdbId } }));
   const movie = movieQuery.data;
   const tv = tvQuery.data;
+  const imagesQuery = useQuery(
+    orpc.tmdb.movie.images.queryOptions({ enabled: !isTv && !!movie, input: { id: tmdbId } }),
+  );
 
   return {
     credits: creditsQuery.data,
@@ -38,6 +41,7 @@ const useTitleQueries = (mediaType: "movie" | "tv", tmdbId: number) => {
     isTv,
     libraryStatus: libraryQuery.data?.[0]?.status,
     movie,
+    posters: imagesQuery.data?.posters,
     refetchDetail: isTv ? tvQuery.refetch : movieQuery.refetch,
     tv,
     watches: watchesQuery.data ?? [],
@@ -140,6 +144,7 @@ export const useTitlePage = (mediaType: "movie" | "tv", tmdbId: number) => {
     libraryStatus: queries.libraryStatus,
     logOpen,
     pendingStatus: actions.pendingStatus,
+    posters: queries.posters,
     setEditingId,
     setLogOpen,
     statusError: actions.statusError,

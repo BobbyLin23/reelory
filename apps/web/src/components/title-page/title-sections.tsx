@@ -40,21 +40,23 @@ export const CastSection = ({
       </h2>
       <Skeleton label="Loading cast" lines={2} loading={isPending}>
         {cast.length > 0 ? (
-          <ul className={styles.cast}>
-            {cast.map((person) => (
-              <li className={styles.person} key={person.id}>
-                <Avatar
-                  name={person.name}
-                  size="lg"
-                  src={tmdbImageUrl(person.profilePath, "w185") ?? undefined}
-                />
-                <p className={styles.personName}>{person.name}</p>
-                {person.character === "" ? null : (
-                  <p className={styles.character}>{person.character}</p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div aria-labelledby="cast-heading" className={styles.cast} role="region" tabIndex={0}>
+            <ul className={styles.castList}>
+              {cast.map((person) => (
+                <li className={styles.person} key={person.id}>
+                  <Avatar
+                    name={person.name}
+                    size="lg"
+                    src={tmdbImageUrl(person.profilePath, "w185") ?? undefined}
+                  />
+                  <p className={styles.personName}>{person.name}</p>
+                  {person.character === "" ? null : (
+                    <p className={styles.character}>{person.character}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : null}
       </Skeleton>
     </section>
