@@ -1,24 +1,24 @@
-import type { TmdbMediaSummary } from "@reelory/api/tmdb/schemas";
+import type { TmdbMediaSummary, TmdbTitleSummary } from "@reelory/api/tmdb/schemas";
 import { useQuery } from "@tanstack/react-query";
-import { Search, SearchX } from "lucide-react";
+import { ChevronRight, Search, SearchX, Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import { Alert } from "@/components/arc/alert/alert";
-import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
+import { Carousel } from "@/components/arc/carousel/carousel";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
-import { PageIntro } from "@/components/page-intro";
-import { tmdbImageUrl, yearFromDate } from "@/utils/media";
+import { formatVote, tmdbImageUrl, yearFromDate } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
 import styles from "./discover.module.css";
 
 const SEARCH_DEBOUNCE_MS = 300;
-const TRENDING_ROW_LIMIT = 10;
+const HERO_LIMIT = 6;
+const ROW_LIMIT = 10;
 
 const KIND_LABEL: Record<TmdbMediaSummary["mediaType"], string> = {
   movie: "Film",
@@ -46,30 +46,26 @@ const summaryPoster = (result: TmdbMediaSummary): string | null =>
 const titlePath = (result: TmdbMediaSummary): string | null =>
   result.mediaType === "person" ? null : `/title/${result.mediaType}/${result.id}`;
 
-const MediaCard = ({ result }: { result: TmdbMediaSummary }) => {
+const summaryMeta = (result: TmdbMediaSummary): string => {
+  if (result.mediaType === "person") {
+    return "Person · No page yet";
+  }
+  const year = summaryYear(result);
+  return year === null ? KIND_LABEL[result.mediaType] : `${year} · ${KIND_LABEL[result.mediaType]}`;
+};
+
+const PosterCard = ({ result }: { result: TmdbMediaSummary }) => {
   const poster = tmdbImageUrl(summaryPoster(result), "w500");
   const path = titlePath(result);
-  const year = summaryYear(result);
   const body = (
     <>
       <div aria-hidden="true" className={styles.poster}>
-        {poster === null ? null : <img alt="" src={poster} />}
+        {poster === null ? null : <img alt="" loading="lazy" src={poster} />}
       </div>
-      <div className={styles.cardCopy}>
-        <p className={styles.cardTitle}>{summaryTitle(result)}</p>
-        {result.mediaType === "person" ? (
-          <p className={styles.personMeta}>
-            <Badge pill size="sm">
-              Person
-            </Badge>
-            <span>Profile page is not available yet.</span>
-          </p>
-        ) : (
-          <p className={styles.meta}>
-            {year ?? "No year"} · {KIND_LABEL[result.mediaType]}
-          </p>
-        )}
-      </div>
+      <p className={styles.cardTitle} title={summaryTitle(result)}>
+        {summaryTitle(result)}
+      </p>
+      <p className={styles.meta}>{summaryMeta(result)}</p>
     </>
   );
 
@@ -84,29 +80,207 @@ const MediaCard = ({ result }: { result: TmdbMediaSummary }) => {
   );
 };
 
-const MediaGrid = ({ results }: { results: TmdbMediaSummary[] }) => (
+const PosterGrid = ({ results }: { results: TmdbMediaSummary[] }) => (
   <ul className={styles.grid}>
     {results.map((result) => (
       <li key={`${result.mediaType}:${result.id}`}>
-        <MediaCard result={result} />
+        <PosterCard result={result} />
       </li>
     ))}
   </ul>
 );
 
-const TrendingRow = ({ results }: { results: TmdbMediaSummary[] }) => (
+const PosterRow = ({ results }: { results: TmdbMediaSummary[] }) => (
   <ul className={styles.row}>
     {results.map((result) => (
       <li className={styles.rowItem} key={`${result.mediaType}:${result.id}`}>
-        <MediaCard result={result} />
+        <PosterCard result={result} />
       </li>
     ))}
   </ul>
 );
 
-const SearchHint = () => (
-  <p className={styles.hint}>Search by title or name. Results update as you type.</p>
-);
+const HeroSlides = ({ titles }: { titles: TmdbTitleSummary[] }) => {
+  const slides = titles.filter((title) => title.backdropPath !== null).slice(0, HERO_LIMIT);
+
+  if (slides.length === 0) {
+    return null;
+  }
+
+  return (
+    <Carousel label="Featured this week" slideSize="78cqw">
+      {slides.map((title, index) => {
+        const backdrop = tmdbImageUrl(title.backdropPath, "w780");
+        const year = summaryYear(title);
+        return (
+          <Link
+            className={styles.hero}
+            key={`${title.mediaType}:${title.id}`}
+            to={`/title/${title.mediaType}/${title.id}`}
+          >
+            <span aria-hidden="true" className={styles.heroMedia}>
+              {backdrop === null ? null : (
+                <img alt="" loading={index < 2 ? "eager" : "lazy"} src={backdrop} />
+              )}
+            </span>
+            <span className={styles.heroCopy}>
+              <span className={styles.heroTitle} title={summaryTitle(title)}>
+                {summaryTitle(title)}
+              </span>
+              <span className={styles.heroMeta}>
+                {title.voteAverage > 0 ? (
+                  <span className={styles.score}>
+                    <Star aria-hidden="true" fill="currentColor" size={14} strokeWidth={1.75} />
+                    <span aria-hidden="true">{formatVote(title.voteAverage)}</span>
+                    <span className={styles.visuallyHidden}>
+                      Rated {formatVote(title.voteAverage)} out of 10
+                    </span>
+                  </span>
+                ) : null}
+                <span>{[year, KIND_LABEL[title.mediaType]].filter(Boolean).join(" · ")}</span>
+              </span>
+            </span>
+          </Link>
+        );
+      })}
+    </Carousel>
+  );
+};
+
+const Hero = ({
+  failed,
+  pending,
+  titles,
+}: {
+  failed: boolean;
+  pending: boolean;
+  titles: TmdbTitleSummary[];
+}) => {
+  if (failed) {
+    return null;
+  }
+  if (pending) {
+    return (
+      <div aria-busy="true" className={styles.heroLoading}>
+        <Skeleton label="Loading featured titles" lines={2} />
+      </div>
+    );
+  }
+  return <HeroSlides titles={titles} />;
+};
+
+interface ShelfProps {
+  id: string;
+  results: TmdbMediaSummary[];
+  title: string;
+  pending: boolean;
+  failed: boolean;
+  onRetry: () => void;
+}
+
+const Shelf = ({ id, results, title, pending, failed, onRetry }: ShelfProps) => {
+  const [expanded, setExpanded] = useState(false);
+  const canExpand = results.length > ROW_LIMIT;
+  const view = expanded ? (
+    <PosterGrid results={results} />
+  ) : (
+    <PosterRow results={results.slice(0, ROW_LIMIT)} />
+  );
+
+  const body = failed ? (
+    <Alert title={`${title} is unavailable`} tone="danger">
+      <p>We could not load these titles. Check your connection and try again.</p>
+      <Button type="button" variant="secondary" onClick={onRetry}>
+        Try again
+      </Button>
+    </Alert>
+  ) : (
+    <Skeleton label={`Loading ${title}`} lines={3} loading={pending}>
+      {results.length === 0 ? (
+        <EmptyState
+          description="Nothing to show here right now. Search for a title instead."
+          icon={<Search aria-hidden="true" size={20} />}
+          title="No titles right now"
+        />
+      ) : (
+        <div id={`${id}-results`}>{view}</div>
+      )}
+    </Skeleton>
+  );
+
+  return (
+    <section aria-labelledby={`${id}-heading`} className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.heading} id={`${id}-heading`}>
+          {title}
+        </h2>
+        {failed || !canExpand ? null : (
+          <Button
+            aria-controls={`${id}-results`}
+            aria-expanded={expanded}
+            type="button"
+            variant="ghost"
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {expanded ? "Show less" : "See all"}
+            {expanded ? null : <ChevronRight aria-hidden="true" size={16} strokeWidth={1.75} />}
+          </Button>
+        )}
+      </div>
+      {body}
+    </section>
+  );
+};
+
+const Browse = () => {
+  const trending = useQuery(
+    orpc.tmdb.trending.queryOptions({
+      input: { mediaType: "all", window: "week" },
+    }),
+  );
+  const upcoming = useQuery(orpc.tmdb.movie.upcoming.queryOptions({ input: {} }));
+  const onTheAir = useQuery(orpc.tmdb.tv.onTheAir.queryOptions({ input: {} }));
+
+  const titles = (trending.data?.results ?? []).filter(
+    (result): result is TmdbTitleSummary => result.mediaType !== "person",
+  );
+
+  return (
+    <div className={styles.browse}>
+      <Hero failed={trending.isError} pending={trending.isPending} titles={titles} />
+      <Shelf
+        failed={trending.isError}
+        id="trending"
+        pending={trending.isPending}
+        results={titles}
+        title="Trending this week"
+        onRetry={() => {
+          trending.refetch();
+        }}
+      />
+      <Shelf
+        failed={upcoming.isError}
+        id="upcoming"
+        pending={upcoming.isPending}
+        results={upcoming.data?.results ?? []}
+        title="Coming soon"
+        onRetry={() => {
+          upcoming.refetch();
+        }}
+      />
+      <Shelf
+        failed={onTheAir.isError}
+        id="on-the-air"
+        pending={onTheAir.isPending}
+        results={onTheAir.data?.results ?? []}
+        title="On the air"
+        onRetry={() => {
+          onTheAir.refetch();
+        }}
+      />
+    </div>
+  );
+};
 
 const SearchResults = ({ query }: { query: string }) => {
   const search = useQuery(
@@ -123,7 +297,13 @@ const SearchResults = ({ query }: { query: string }) => {
     return (
       <Alert title="Search is unavailable" tone="danger">
         <p>We could not reach TMDB. Check your connection and try again.</p>
-        <Button type="button" variant="secondary" onClick={() => search.refetch()}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            search.refetch();
+          }}
+        >
           Try again
         </Button>
       </Alert>
@@ -142,7 +322,7 @@ const SearchResults = ({ query }: { query: string }) => {
       />
     );
   } else {
-    body = <MediaGrid results={results} />;
+    body = <PosterGrid results={results} />;
   }
 
   return (
@@ -154,68 +334,6 @@ const SearchResults = ({ query }: { query: string }) => {
         {search.isPending ? null : <p className={styles.sectionHint}>{count}</p>}
       </div>
       {body}
-    </section>
-  );
-};
-
-const Trending = () => {
-  const trending = useQuery(
-    orpc.tmdb.trending.queryOptions({
-      input: { mediaType: "all", window: "week" },
-    }),
-  );
-  const [expanded, setExpanded] = useState(false);
-  const results = (trending.data?.results ?? []).filter((result) => result.mediaType !== "person");
-  const canExpand = results.length > TRENDING_ROW_LIMIT;
-  const shown = expanded ? results : results.slice(0, TRENDING_ROW_LIMIT);
-  const view = expanded ? <MediaGrid results={shown} /> : <TrendingRow results={shown} />;
-
-  return (
-    <section aria-labelledby="trending-heading" className={styles.section}>
-      <div className={styles.sectionHeader}>
-        <div className={styles.sectionCopy}>
-          <h2 className={styles.heading} id="trending-heading">
-            Trending this week
-          </h2>
-          <p className={styles.sectionHint}>What people are watching on TMDB right now.</p>
-        </div>
-        {canExpand ? (
-          <Button
-            aria-controls="trending-results"
-            aria-expanded={expanded}
-            type="button"
-            variant="secondary"
-            onClick={() => setExpanded((open) => !open)}
-          >
-            {expanded ? "Show less" : "See all"}
-          </Button>
-        ) : null}
-      </div>
-      {trending.isError ? (
-        <Alert title="Trending is unavailable" tone="danger">
-          <p>We could not load what is trending. Check your connection and try again.</p>
-          <Button type="button" variant="secondary" onClick={() => trending.refetch()}>
-            Try again
-          </Button>
-        </Alert>
-      ) : (
-        <Skeleton
-          className={styles.trendingBody}
-          label="Loading trending titles"
-          lines={3}
-          loading={trending.isPending}
-        >
-          {results.length === 0 ? (
-            <EmptyState
-              description="There is nothing trending right now. Search for a title instead."
-              icon={<Search aria-hidden="true" size={20} />}
-              title="No trending titles"
-            />
-          ) : (
-            <div id="trending-results">{view}</div>
-          )}
-        </Skeleton>
-      )}
     </section>
   );
 };
@@ -234,7 +352,7 @@ export const Discover = () => {
     [],
   );
 
-  // Search waits for typing to pause; an empty field drops back to trending at once.
+  // Search waits for typing to pause; an empty field drops back to browsing at once.
   const changeQuery = (value: string) => {
     if (debounce.current !== null) {
       clearTimeout(debounce.current);
@@ -258,7 +376,7 @@ export const Discover = () => {
 
   let content: ReactNode;
   if (!searchActive) {
-    content = <Trending />;
+    content = <Browse />;
   } else if (waitingForQuery) {
     content = <Skeleton label="Searching TMDB" lines={5} />;
   } else {
@@ -267,21 +385,19 @@ export const Discover = () => {
 
   return (
     <div className={styles.page}>
-      <PageIntro
-        description="Search films, series, and people, and see what's trending."
-        title="Discover"
-      />
-      <div className={styles.search}>
-        <SearchField
-          autoComplete="off"
-          label="Search films, series, and people"
-          maxLength={200}
-          placeholder="Dune, Breaking Bad, Zendaya"
-          value={query}
-          onValueChange={changeQuery}
-        />
-        {searchActive ? null : <SearchHint />}
-      </div>
+      <header className={styles.header}>
+        <h1 className={styles.title}>Discover</h1>
+        <div className={styles.search}>
+          <SearchField
+            autoComplete="off"
+            label="Search"
+            maxLength={200}
+            placeholder="Film, series, or person"
+            value={query}
+            onValueChange={changeQuery}
+          />
+        </div>
+      </header>
       {content}
     </div>
   );
