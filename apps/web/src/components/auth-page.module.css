@@ -62,6 +62,11 @@
   text-wrap: pretty;
 }
 
+/* Clerk insets its card by -1px to cover the card box border, and the box clips overflow, shearing a flat edge into the left of every control. */
+.form :global(.cl-card) {
+  margin: 0;
+}
+
 /* Clerk draws its fields and buttons with single-class rules, so these scoped rules give them Arc's filled treatment. */
 .form :global(input.cl-formFieldInput),
 .form :global(.cl-otpCodeFieldInput.cl-input) {
