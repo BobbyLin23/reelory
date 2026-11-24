@@ -62,9 +62,14 @@
   text-wrap: pretty;
 }
 
-/* Clerk insets its card by -1px to cover the card box border, and the box clips overflow, shearing a flat edge into the left of every control. */
+/* Clerk insets its card by -1px to cover the card box border; align it so the controls match the heading and card edges. */
 .form :global(.cl-card) {
   margin: 0;
+}
+
+/* The card is transparent, so its box must not clip content that overhangs it, such as the last-used badge above the social button. */
+.form :global(.cl-cardBox) {
+  overflow: visible;
 }
 
 /* Clerk draws its fields and buttons with single-class rules, so these scoped rules give them Arc's filled treatment. */

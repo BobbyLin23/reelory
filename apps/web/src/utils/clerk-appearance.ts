@@ -63,6 +63,11 @@ export const clerkAppearance = {
       color: "var(--foreground)",
       fontSize: "var(--text-sm)",
     },
+    lastAuthenticationStrategyBadge: {
+      background: "var(--background)",
+      boxShadow: "0 0 0 1px var(--background)",
+      color: "var(--text-secondary)",
+    },
     otpCodeFieldInput: {
       backgroundColor: "var(--field-fill)",
       borderRadius: "var(--radius-control)",
