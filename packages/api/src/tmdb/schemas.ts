@@ -177,6 +177,7 @@ const seasonSummarySchema = z.object({
 
 export const tvDetailSchema = z.object({
   backdropPath: imagePath,
+  createdBy: z.array(namedEntitySchema),
   episodeRunTime: z.array(z.number().int()),
   firstAirDate: isoDate,
   genres: z.array(namedEntitySchema),

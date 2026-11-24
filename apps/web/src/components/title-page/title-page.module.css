@@ -160,6 +160,29 @@
   font-size: var(--text-base);
 }
 
+.crew {
+  display: grid;
+  max-width: 65ch;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.crew > div {
+  display: grid;
+  grid-template-columns: minmax(0, 8.5rem) minmax(0, 1fr);
+  gap: var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.crew dt {
+  color: var(--text-secondary);
+}
+
+.crew dd {
+  margin: 0;
+}
+
 .cast {
   min-width: 0;
   overflow-x: auto;

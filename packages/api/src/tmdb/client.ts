@@ -154,6 +154,7 @@ interface RawTvDetail {
   id: number;
   name?: string;
   original_name?: string;
+  created_by?: RawNamed[];
   overview?: string;
   tagline?: string | null;
   status?: string;
@@ -410,6 +411,7 @@ const toSeasonSummary = (season: RawSeasonSummary) => ({
 
 const toTvDetail = (raw: RawTvDetail): TmdbTvDetail => ({
   backdropPath: raw.backdrop_path ?? null,
+  createdBy: toNamedList(raw.created_by),
   episodeRunTime: raw.episode_run_time ?? [],
   firstAirDate: raw.first_air_date ?? null,
   genres: toNamedList(raw.genres),

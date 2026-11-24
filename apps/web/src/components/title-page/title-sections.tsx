@@ -10,6 +10,11 @@ import { formatWatchDate, ratingToStars, tmdbImageUrl, yearFromDate } from "@/ut
 import styles from "./title-page.module.css";
 
 const CAST_LIMIT = 12;
+const CREW_ROLES = [
+  ["Director", "Directed by"],
+  ["Producer", "Produced by"],
+  ["Executive Producer", "Executive production"],
+] as const;
 
 export interface WatchLog {
   episode: number | null;
@@ -19,6 +24,49 @@ export interface WatchLog {
   season: number | null;
   watchedOn: string | null;
 }
+
+export const CrewSection = ({
+  creators,
+  credits,
+  isTv,
+}: {
+  creators: TmdbTvDetail["createdBy"];
+  credits: TmdbCredits | undefined;
+  isTv: boolean;
+}) => {
+  const roles = CREW_ROLES.map(([job, label]) => ({
+    label,
+    names: (credits?.crew ?? []).filter((person) => person.job === job).map(({ name }) => name),
+  }));
+  const rows = [{ label: "Created by", names: creators.map(({ name }) => name) }, ...roles]
+    .map(({ label, names }) => ({
+      label,
+      names: [...new Set(names.map((name) => name.trim()).filter(Boolean))],
+    }))
+    .filter(({ names }) => names.length > 0);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <section aria-labelledby="crew-heading" className={styles.section}>
+      <h2 className={styles.heading} id="crew-heading">
+        Crew
+      </h2>
+      {isTv && rows.some(({ label }) => label !== "Created by") ? (
+        <p className={styles.note}>Directing and production credits are for the latest season.</p>
+      ) : null}
+      <dl className={styles.crew}>
+        {rows.map(({ label, names }) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>{names.join(", ")}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+};
 
 export const CastSection = ({
   credits,

@@ -13,7 +13,7 @@ import { LIBRARY_STATUS_ACTIONS, formatVote, tmdbImageUrl } from "@/utils/media"
 
 import { LogSheet } from "./log-sheet";
 import { SeriesProgressSection } from "./series-progress-section";
-import { CastSection, SeasonsSection, WatchesSection } from "./title-sections";
+import { CastSection, CrewSection, SeasonsSection, WatchesSection } from "./title-sections";
 import { errorCode, useTitlePage } from "./use-title-page";
 
 import styles from "./title-page.module.css";
@@ -240,6 +240,7 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
           watches={page.watches}
         />
       ) : null}
+      <CrewSection creators={page.creators} credits={page.credits} isTv={page.isTv} />
       <CastSection credits={page.credits} isPending={page.creditsPending} />
       {page.isTv ? <SeasonsSection seasons={page.seasons} /> : null}
       <WatchesSection

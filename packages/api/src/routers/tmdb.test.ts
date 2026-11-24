@@ -93,6 +93,19 @@ test("includes fallback poster art alongside the localized movie image catalog",
   ]);
 });
 
+test("returns series creators when TMDB provides them and an empty list otherwise", async () => {
+  const { rpc } = setup((url) => ({
+    id,
+    name: "Series",
+    ...(url.pathname.endsWith(`/${id}`)
+      ? { created_by: [{ id: 42, name: "Series creator", credit_id: "creator-credit" }] }
+      : {}),
+  }));
+
+  expect((await rpc.tv.detail({ id })).createdBy).toEqual([{ id: 42, name: "Series creator" }]);
+  expect((await rpc.tv.detail({ id: id + 1 })).createdBy).toEqual([]);
+});
+
 test("selects the requested provider region on both cache misses and hits", async () => {
   const { requests, rpc, ttls } = setup(() => ({
     id,
