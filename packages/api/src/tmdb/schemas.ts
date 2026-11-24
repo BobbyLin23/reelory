@@ -87,8 +87,12 @@ const tvSummarySchema = z.object({
   voteCount: z.number().int(),
 });
 
+const titleSummarySchema = z.discriminatedUnion("mediaType", [movieSummarySchema, tvSummarySchema]);
+export type TmdbTitleSummary = z.infer<typeof titleSummarySchema>;
+
 const personSummarySchema = z.object({
   id: tmdbId,
+  knownFor: z.array(titleSummarySchema).optional(),
   knownForDepartment: z.string().nullable(),
   mediaType: z.literal("person"),
   name: z.string(),

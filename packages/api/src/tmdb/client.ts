@@ -10,6 +10,7 @@ import type {
   TmdbMediaSummary,
   TmdbMovieDetail,
   TmdbSeasonDetail,
+  TmdbTitleSummary,
   TmdbTvDetail,
   TmdbWatchProviders,
 } from "./schemas";
@@ -17,6 +18,7 @@ import type {
 const TMDB_API_URL = "https://api.themoviedb.org/3";
 const DEFAULT_LANGUAGE = "en-US";
 const DEFAULT_REGION = "US";
+const KNOWN_FOR_LIMIT = 3;
 
 /** Bump when the shape of a cached response changes so old entries are ignored. */
 const CACHE_KEY_PREFIX = "tmdb:v1";
@@ -72,6 +74,7 @@ type SeasonInput = MediaInput & {
 };
 
 interface RawMediaSummary {
+  adult?: boolean;
   id: number;
   media_type?: string;
   title?: string;
@@ -86,6 +89,7 @@ interface RawMediaSummary {
   vote_count?: number;
   popularity?: number;
   genre_ids?: number[];
+  known_for?: RawMediaSummary[];
   known_for_department?: string | null;
 }
 
@@ -284,7 +288,7 @@ const toCountryList = (countries: { iso_3166_1?: string; name?: string }[] | und
     name: country.name ?? "",
   }));
 
-const toMovieSummary = (raw: RawMediaSummary): TmdbMediaSummary => ({
+const toMovieSummary = (raw: RawMediaSummary): TmdbTitleSummary => ({
   backdropPath: raw.backdrop_path ?? null,
   genreIds: raw.genre_ids ?? [],
   id: raw.id,
@@ -298,7 +302,7 @@ const toMovieSummary = (raw: RawMediaSummary): TmdbMediaSummary => ({
   voteCount: raw.vote_count ?? 0,
 });
 
-const toTvSummary = (raw: RawMediaSummary): TmdbMediaSummary => ({
+const toTvSummary = (raw: RawMediaSummary): TmdbTitleSummary => ({
   backdropPath: raw.backdrop_path ?? null,
   firstAirDate: raw.first_air_date ?? null,
   genreIds: raw.genre_ids ?? [],
@@ -312,8 +316,27 @@ const toTvSummary = (raw: RawMediaSummary): TmdbMediaSummary => ({
   voteCount: raw.vote_count ?? 0,
 });
 
+const toKnownFor = (items: RawMediaSummary[]): TmdbTitleSummary[] => {
+  const titles: TmdbTitleSummary[] = [];
+  for (const item of items) {
+    if (item.adult) {
+      continue;
+    }
+    if (item.media_type === "movie") {
+      titles.push(toMovieSummary(item));
+    } else if (item.media_type === "tv") {
+      titles.push(toTvSummary(item));
+    }
+    if (titles.length === KNOWN_FOR_LIMIT) {
+      break;
+    }
+  }
+  return titles;
+};
+
 const toPersonSummary = (raw: RawMediaSummary): TmdbMediaSummary => ({
   id: raw.id,
+  knownFor: raw.known_for && toKnownFor(raw.known_for),
   knownForDepartment: raw.known_for_department ?? null,
   mediaType: "person",
   name: raw.name ?? "",

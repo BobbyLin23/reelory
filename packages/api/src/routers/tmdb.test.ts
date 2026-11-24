@@ -167,3 +167,42 @@ test("returns typed BAD_REQUEST errors before reaching TMDB for invalid locales"
   });
   expect(requests).toHaveLength(0);
 });
+
+test("returns bounded film and series highlights for an actor from one cached multi-search", async () => {
+  const { requests, rpc, ttls } = setup(() => ({
+    results: [
+      {
+        id: 42,
+        known_for: [
+          { adult: true, id: 20, media_type: "movie", title: "Excluded" },
+          { id: 21, media_type: "person", name: "Not a title" },
+          { id: 22, media_type: "movie", title: "沙丘" },
+          { id: 22, media_type: "tv", name: "亢奋" },
+          { id: 23, media_type: "tv", name: "Another series" },
+          { id: 24, media_type: "movie", title: "Over the limit" },
+        ],
+        known_for_department: "Acting",
+        media_type: "person",
+        name: "Zendaya",
+      },
+    ],
+  }));
+
+  const first = await rpc.search({ ...cn, query: "Zendaya" });
+  expect(first.results).toMatchObject([
+    {
+      knownFor: [
+        { id: 22, mediaType: "movie", title: "沙丘" },
+        { id: 22, mediaType: "tv", name: "亢奋" },
+        { id: 23, mediaType: "tv" },
+      ],
+      mediaType: "person",
+      name: "Zendaya",
+    },
+  ]);
+  expect(await rpc.search({ ...cn, query: " Zendaya " })).toEqual(first);
+  expect(requests.map((url) => url.pathname)).toEqual(["/3/search/multi"]);
+  expect(requests[0]?.searchParams.get("language")).toBe("zh-CN");
+  expect(requests[0]?.searchParams.get("include_adult")).toBe("false");
+  expect([...ttls.values()]).toEqual([3600]);
+});

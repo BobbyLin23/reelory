@@ -1,13 +1,15 @@
 import type { TmdbTvDetail } from "@reelory/api/tmdb/schemas";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Search, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { SearchField } from "@/components/arc/search-field/search-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import type { Segment } from "@/components/arc/segmented-control/segmented-control";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
@@ -24,6 +26,8 @@ import {
   toIsoDate,
 } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
+
+import { AddTitleDialog } from "./add-title-dialog";
 
 import styles from "./library-home.module.css";
 
@@ -90,6 +94,10 @@ const titlePath = (entry: LibraryItem) => `/title/${entry.mediaType}/${entry.tmd
 
 const titleKey = (entry: LibraryItem) => `${entry.mediaType}:${entry.tmdbId}`;
 
+const statusLabel = Object.fromEntries(
+  LIBRARY_STATUS_ACTIONS.map(({ label, status }) => [status, label]),
+);
+
 interface RailItem {
   entry: LibraryItem;
   /** Undefined while the cached TMDB season data is loading or unavailable. */
@@ -112,6 +120,81 @@ const Poster = ({
     <div aria-hidden="true" className={className}>
       {src === null ? null : <img alt="" src={src} />}
     </div>
+  );
+};
+
+const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
+  const [query, setQuery] = useState("");
+  const field = useRef<HTMLInputElement>(null);
+  const term = query.trim().toLowerCase();
+  const matches = term
+    ? (entries ?? []).filter((entry) => entry.title.toLowerCase().includes(term))
+    : [];
+  let message = "";
+  if (entries?.length === 0) {
+    message = "Your library is empty. Use Add on Home to find a title to save.";
+  } else if (term && matches.length === 0) {
+    message = "No saved titles match. Try another title.";
+  } else if (matches.length > 0) {
+    message = matches.length === 1 ? "1 title found" : `${matches.length} titles found`;
+  }
+
+  return (
+    <Dialog
+      onOpenChange={(open) => {
+        if (!open) {
+          setQuery("");
+        }
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button disabled={entries === undefined} size="lg" type="button" variant="secondary">
+          <Search aria-hidden="true" />
+          Search
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        description="Find films and series you’ve saved, regardless of watch status."
+        title="Search your library"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          field.current?.focus();
+        }}
+      >
+        <div className={styles.titleSearch}>
+          <SearchField
+            ref={field}
+            autoComplete="off"
+            label="Film or series title"
+            placeholder="Search by title"
+            value={query}
+            onValueChange={setQuery}
+          />
+          <output className={!message || matches.length > 0 ? styles.srOnly : styles.searchMeta}>
+            {message}
+          </output>
+          {matches.length > 0 ? (
+            <ul aria-label="Matching saved titles" className={styles.searchResults}>
+              {matches.map((entry) => (
+                <li key={entry.id}>
+                  <Link className={styles.searchResult} to={titlePath(entry)}>
+                    <Poster className={styles.searchPoster} path={entry.posterPath} size="w185" />
+                    <span className={styles.searchCopy}>
+                      <span className={styles.cardTitle}>{entry.title}</span>
+                      <span className={styles.searchMeta}>
+                        {[KIND_LABEL[entry.mediaType], entry.year, statusLabel[entry.status]]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -271,13 +354,23 @@ export const LibraryHome = () => {
     }
   }, []);
 
+  const intro = (
+    <header className={styles.pageHeader}>
+      <PageIntro
+        description="Your library of films and series, and what to watch next."
+        title="Home"
+      />
+      <div className={styles.pageActions}>
+        <LibrarySearch entries={libraryQuery.data?.entries} />
+        <AddTitleDialog />
+      </div>
+    </header>
+  );
+
   if (libraryQuery.error) {
     return (
       <div className={styles.page}>
-        <PageIntro
-          description="Your library of films and series, and what to watch next."
-          title="Home"
-        />
+        {intro}
         <Alert title="Could not load your library" tone="danger">
           <Button type="button" variant="secondary" onClick={() => libraryQuery.refetch()}>
             Try again
@@ -327,10 +420,7 @@ export const LibraryHome = () => {
 
   return (
     <div className={styles.page}>
-      <PageIntro
-        description="Your library of films and series, and what to watch next."
-        title="Home"
-      />
+      {intro}
       <Skeleton label="Loading your library" lines={6} loading={libraryQuery.isPending}>
         <div className={styles.library}>
           <div className={styles.controls}>
