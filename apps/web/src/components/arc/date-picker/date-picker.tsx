@@ -28,6 +28,17 @@ export interface DatePickerProps extends Omit<
   format?: Intl.DateTimeFormatOptions;
   /** Adds a Today button to the calendar header. */
   showToday?: boolean;
+  /** Localized copy for the calendar, its footer, and its accessible name. */
+  labels?: Partial<{
+    calendar: string;
+    chooseDay: string;
+    clear: string;
+    nextMonth: string;
+    previousMonth: string;
+    selected: string;
+    today: string;
+    todayFull: string;
+  }>;
 }
 
 const monthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
@@ -42,15 +53,15 @@ const valueRoll: Variants = {
     y: 0,
   },
   enter: (direction: number) => ({
+    filter: `blur(${blur.soft}px)`,
     opacity: 0,
     y: `${direction * 0.35}em`,
-    filter: `blur(${blur.soft}px)`,
   }),
   exit: (direction: number) => ({
-    opacity: 0,
-    y: `${direction * -0.3}em`,
     filter: `blur(${blur.subtle}px)`,
+    opacity: 0,
     transition: { duration: motionTokens.duration.fast, ease: ease.standard },
+    y: `${direction * -0.3}em`,
   }),
 };
 /** Reduced motion keeps a short crossfade; resting values match the roll so server and client markup agree. */
@@ -88,11 +99,25 @@ export function DatePicker({
   locale = "en-US",
   format = { day: "numeric", month: "short", year: "numeric" },
   showToday,
+  labels: labelOverrides,
   id,
   className,
   disabled,
   ...buttonProps
 }: DatePickerProps) {
+  const labels = {
+    calendar: "{label} calendar",
+    chooseDay: "Choose a day",
+    clear: "Clear",
+    nextMonth: "Next month",
+    previousMonth: "Previous month",
+    selected: "Selected {date}",
+    today: "Today",
+    todayFull: "Today, {date}",
+    ...labelOverrides,
+  };
+  const fill = (template: string, values: Record<string, string>) =>
+    template.replaceAll(/\{(\w+)\}/gu, (_match, name: string) => values[name] ?? "");
   const generatedId = useId();
   const controlId = id ?? generatedId;
   const hintId = description ? `${controlId}-description` : undefined;
@@ -269,7 +294,7 @@ export function DatePicker({
               ref={popoverRef}
               className={styles.popover}
               role="dialog"
-              aria-label={`${label} calendar`}
+              aria-label={fill(labels.calendar, { label })}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.stopPropagation();
@@ -300,11 +325,12 @@ export function DatePicker({
                 maxDate={maxDate}
                 disabledDates={disabledDates}
                 locale={locale}
+                labels={labels}
                 showToday={showToday}
               />
               <div className={styles.footer}>
                 <button type="button" onClick={() => selectDate(undefined)} disabled={!value}>
-                  Clear
+                  {labels.clear}
                 </button>
                 <span className={styles.status}>
                   <AnimatePresence initial={false}>
@@ -315,7 +341,9 @@ export function DatePicker({
                       animate="center"
                       exit="exit"
                     >
-                      {value ? `Selected ${formatter.format(value)}` : "Choose a day"}
+                      {value
+                        ? fill(labels.selected, { date: formatter.format(value) })
+                        : labels.chooseDay}
                     </motion.span>
                   </AnimatePresence>
                 </span>

@@ -4,6 +4,7 @@ import {
   episodesThrough,
   formatEpisode,
   formatRuntime,
+  formatWatchDate,
   furthestEpisode,
   isMediaType,
   librarySnapshot,
@@ -29,7 +30,7 @@ test("parses title route params and TMDB image paths", () => {
 
 test("snapshots library metadata and maps half-star ratings to 1-10", () => {
   expect(yearFromDate("1999-10-15")).toBe(1999);
-  expect(formatRuntime(142)).toBe("2h 22m");
+  expect(formatRuntime(142, "en")).toBe("2h 22m");
   expect(starsToRating(4.5)).toBe(9);
   expect(starsToRating(0)).toBeNull();
   expect(ratingToStars(9)).toBe(4.5);
@@ -65,10 +66,20 @@ const seasons = [
   { episodeCount: 10, seasonNumber: 3 },
 ];
 
+test("formats runtime, dates, and episodes for the interface language", () => {
+  expect(formatRuntime(142, "zh-CN")).toBe("2 小时 22 分钟");
+  expect(formatRuntime(45, "zh-CN")).toBe("45 分钟");
+  expect(formatRuntime(120, "zh-CN")).toBe("2 小时");
+  expect(formatEpisode({ episode: 2, season: 3 }, "zh-CN")).toBe("第3季第2集");
+  expect(formatWatchDate("2026-11-20", "en")).toBe("Nov 20, 2026");
+  expect(formatWatchDate("2026-11-20", "zh-CN")).toBe("2026年11月20日");
+  expect(formatWatchDate(null, "zh-CN")).toBeNull();
+});
+
 test("counts only regular seasons with episodes, in airing order", () => {
   expect(seriesTotals(seasons)).toEqual({ episodeCount: 18, seasonCount: 2 });
   expect(seriesTotals([])).toEqual({ episodeCount: 0, seasonCount: 0 });
-  expect(formatEpisode({ episode: 2, season: 3 })).toBe("S3E2");
+  expect(formatEpisode({ episode: 2, season: 3 }, "en")).toBe("S3E2");
 });
 
 test("advances one episode, rolls into the next season, and stops at the last episode", () => {

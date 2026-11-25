@@ -11,6 +11,9 @@ import { Carousel } from "@/components/arc/carousel/carousel";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { useI18n } from "@/i18n/i18n";
+import type { Locale } from "@/i18n/locale";
+import { translate } from "@/i18n/messages";
 import { formatVote, tmdbImageUrl, yearFromDate } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
@@ -20,10 +23,14 @@ const SEARCH_DEBOUNCE_MS = 300;
 const HERO_LIMIT = 6;
 const ROW_LIMIT = 10;
 
-const KIND_LABEL: Record<TmdbMediaSummary["mediaType"], string> = {
-  movie: "Film",
-  person: "Person",
-  tv: "Series",
+const kindLabel = (mediaType: TmdbMediaSummary["mediaType"], locale: Locale): string => {
+  if (mediaType === "movie") {
+    return translate(locale, "common.film");
+  }
+  if (mediaType === "tv") {
+    return translate(locale, "common.series");
+  }
+  return translate(locale, "common.person");
 };
 
 const summaryTitle = (result: TmdbMediaSummary): string =>
@@ -46,15 +53,17 @@ const summaryPoster = (result: TmdbMediaSummary): string | null =>
 const titlePath = (result: TmdbMediaSummary): string | null =>
   result.mediaType === "person" ? null : `/title/${result.mediaType}/${result.id}`;
 
-const summaryMeta = (result: TmdbMediaSummary): string => {
+const summaryMeta = (result: TmdbMediaSummary, locale: Locale): string => {
   if (result.mediaType === "person") {
-    return "Person · No page yet";
+    return translate(locale, "discover.personMeta");
   }
   const year = summaryYear(result);
-  return year === null ? KIND_LABEL[result.mediaType] : `${year} · ${KIND_LABEL[result.mediaType]}`;
+  const kind = kindLabel(result.mediaType, locale);
+  return year === null ? kind : `${year} · ${kind}`;
 };
 
 const PosterCard = ({ result }: { result: TmdbMediaSummary }) => {
+  const { locale } = useI18n();
   const poster = tmdbImageUrl(summaryPoster(result), "w500");
   const path = titlePath(result);
   const body = (
@@ -65,7 +74,7 @@ const PosterCard = ({ result }: { result: TmdbMediaSummary }) => {
       <p className={styles.cardTitle} title={summaryTitle(result)}>
         {summaryTitle(result)}
       </p>
-      <p className={styles.meta}>{summaryMeta(result)}</p>
+      <p className={styles.meta}>{summaryMeta(result, locale)}</p>
     </>
   );
 
@@ -101,6 +110,7 @@ const PosterRow = ({ results }: { results: TmdbMediaSummary[] }) => (
 );
 
 const HeroSlides = ({ titles }: { titles: TmdbTitleSummary[] }) => {
+  const { locale, t } = useI18n();
   const slides = titles.filter((title) => title.backdropPath !== null).slice(0, HERO_LIMIT);
 
   if (slides.length === 0) {
@@ -108,7 +118,19 @@ const HeroSlides = ({ titles }: { titles: TmdbTitleSummary[] }) => {
   }
 
   return (
-    <Carousel label="Featured this week" slideSize="78cqw">
+    <Carousel
+      labels={{
+        chooseSlide: t("arc.carousel.choose"),
+        nextSlide: t("arc.carousel.next"),
+        pauseRotation: t("arc.carousel.pause"),
+        previousSlide: t("arc.carousel.previous"),
+        slide: t("arc.carousel.slide"),
+        slides: t("arc.carousel.slides"),
+        startRotation: t("arc.carousel.play"),
+      }}
+      label={t("discover.featured")}
+      slideSize="78cqw"
+    >
       {slides.map((title, index) => {
         const backdrop = tmdbImageUrl(title.backdropPath, "w780");
         const year = summaryYear(title);
@@ -131,13 +153,17 @@ const HeroSlides = ({ titles }: { titles: TmdbTitleSummary[] }) => {
                 {title.voteAverage > 0 ? (
                   <span className={styles.score}>
                     <Star aria-hidden="true" fill="currentColor" size={14} strokeWidth={1.75} />
-                    <span aria-hidden="true">{formatVote(title.voteAverage)}</span>
+                    <span aria-hidden="true">{formatVote(title.voteAverage, locale)}</span>
                     <span className={styles.visuallyHidden}>
-                      Rated {formatVote(title.voteAverage)} out of 10
+                      {t("discover.ratedOutOf10", {
+                        value: formatVote(title.voteAverage, locale),
+                      })}
                     </span>
                   </span>
                 ) : null}
-                <span>{[year, KIND_LABEL[title.mediaType]].filter(Boolean).join(" · ")}</span>
+                <span>
+                  {[year, kindLabel(title.mediaType, locale)].filter(Boolean).join(" · ")}
+                </span>
               </span>
             </span>
           </Link>
@@ -156,13 +182,15 @@ const Hero = ({
   pending: boolean;
   titles: TmdbTitleSummary[];
 }) => {
+  const { t } = useI18n();
+
   if (failed) {
     return null;
   }
   if (pending) {
     return (
       <div aria-busy="true" className={styles.heroLoading}>
-        <Skeleton label="Loading featured titles" lines={2} />
+        <Skeleton label={t("discover.loadingFeatured")} lines={2} />
       </div>
     );
   }
@@ -179,6 +207,7 @@ interface ShelfProps {
 }
 
 const Shelf = ({ id, results, title, pending, failed, onRetry }: ShelfProps) => {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const canExpand = results.length > ROW_LIMIT;
   const view = expanded ? (
@@ -188,19 +217,19 @@ const Shelf = ({ id, results, title, pending, failed, onRetry }: ShelfProps) => 
   );
 
   const body = failed ? (
-    <Alert title={`${title} is unavailable`} tone="danger">
-      <p>We could not load these titles. Check your connection and try again.</p>
+    <Alert title={t("discover.unavailable", { title })} tone="danger">
+      <p>{t("discover.shelfError")}</p>
       <Button type="button" variant="secondary" onClick={onRetry}>
-        Try again
+        {t("common.tryAgain")}
       </Button>
     </Alert>
   ) : (
-    <Skeleton label={`Loading ${title}`} lines={3} loading={pending}>
+    <Skeleton label={t("discover.loadingShelf", { title })} lines={3} loading={pending}>
       {results.length === 0 ? (
         <EmptyState
-          description="Nothing to show here right now. Search for a title instead."
+          description={t("discover.shelfEmptyDescription")}
           icon={<Search aria-hidden="true" size={20} />}
-          title="No titles right now"
+          title={t("discover.shelfEmptyTitle")}
         />
       ) : (
         <div id={`${id}-results`}>{view}</div>
@@ -222,7 +251,7 @@ const Shelf = ({ id, results, title, pending, failed, onRetry }: ShelfProps) => 
             variant="ghost"
             onClick={() => setExpanded((open) => !open)}
           >
-            {expanded ? "Show less" : "See all"}
+            {expanded ? t("discover.showLess") : t("discover.seeAll")}
             {expanded ? null : <ChevronRight aria-hidden="true" size={16} strokeWidth={1.75} />}
           </Button>
         )}
@@ -233,6 +262,7 @@ const Shelf = ({ id, results, title, pending, failed, onRetry }: ShelfProps) => 
 };
 
 const Browse = () => {
+  const { t } = useI18n();
   const trending = useQuery(
     orpc.tmdb.trending.queryOptions({
       input: { mediaType: "all", window: "week" },
@@ -255,7 +285,7 @@ const Browse = () => {
         id="trending"
         pending={trending.isPending}
         results={titles}
-        title="Trending this week"
+        title={t("discover.trending")}
         onRetry={() => {
           trending.refetch();
         }}
@@ -265,7 +295,7 @@ const Browse = () => {
         id="top-films"
         pending={topFilms.isPending}
         results={topFilms.data?.results ?? []}
-        title="Top rated films"
+        title={t("discover.topFilms")}
         onRetry={() => {
           topFilms.refetch();
         }}
@@ -275,7 +305,7 @@ const Browse = () => {
         id="top-series"
         pending={topSeries.isPending}
         results={topSeries.data?.results ?? []}
-        title="Top rated series"
+        title={t("discover.topSeries")}
         onRetry={() => {
           topSeries.refetch();
         }}
@@ -285,7 +315,7 @@ const Browse = () => {
         id="upcoming"
         pending={upcoming.isPending}
         results={upcoming.data?.results ?? []}
-        title="Coming soon"
+        title={t("discover.upcoming")}
         onRetry={() => {
           upcoming.refetch();
         }}
@@ -295,7 +325,7 @@ const Browse = () => {
         id="on-the-air"
         pending={onTheAir.isPending}
         results={onTheAir.data?.results ?? []}
-        title="On the air"
+        title={t("discover.onTheAir")}
         onRetry={() => {
           onTheAir.refetch();
         }}
@@ -305,6 +335,7 @@ const Browse = () => {
 };
 
 const SearchResults = ({ query }: { query: string }) => {
+  const { t } = useI18n();
   const search = useQuery(
     orpc.tmdb.search.queryOptions({ enabled: query !== "", input: { query } }),
   );
@@ -312,13 +343,13 @@ const SearchResults = ({ query }: { query: string }) => {
   const total = search.data?.totalResults ?? 0;
   const count =
     (search.data?.totalPages ?? 0) > 1
-      ? `Showing ${results.length} of ${total}`
-      : `${total} ${total === 1 ? "match" : "matches"}`;
+      ? t("discover.showing", { shown: results.length, total })
+      : t("count.matches", { count: total });
 
   if (search.isError) {
     return (
-      <Alert title="Search is unavailable" tone="danger">
-        <p>We could not reach TMDB. Check your connection and try again.</p>
+      <Alert title={t("discover.searchErrorTitle")} tone="danger">
+        <p>{t("discover.searchErrorHelp")}</p>
         <Button
           type="button"
           variant="secondary"
@@ -326,7 +357,7 @@ const SearchResults = ({ query }: { query: string }) => {
             search.refetch();
           }}
         >
-          Try again
+          {t("common.tryAgain")}
         </Button>
       </Alert>
     );
@@ -334,13 +365,13 @@ const SearchResults = ({ query }: { query: string }) => {
 
   let body: ReactNode;
   if (search.isPending) {
-    body = <Skeleton label="Loading search results" lines={5} />;
+    body = <Skeleton label={t("discover.loadingSearch")} lines={5} />;
   } else if (results.length === 0) {
     body = (
       <EmptyState
-        description="Check the spelling, or try the title in another language."
+        description={t("discover.noResultsDescription")}
         icon={<SearchX aria-hidden="true" size={20} />}
-        title="No results for that search"
+        title={t("discover.noResultsTitle")}
       />
     );
   } else {
@@ -351,7 +382,7 @@ const SearchResults = ({ query }: { query: string }) => {
     <section aria-labelledby="search-results-heading" className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2 className={styles.heading} id="search-results-heading">
-          Results for “{query}”
+          {t("discover.resultsFor", { query })}
         </h2>
         {search.isPending ? null : <p className={styles.sectionHint}>{count}</p>}
       </div>
@@ -361,6 +392,7 @@ const SearchResults = ({ query }: { query: string }) => {
 };
 
 export const Discover = () => {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [settledQuery, setSettledQuery] = useState("");
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -400,7 +432,7 @@ export const Discover = () => {
   if (!searchActive) {
     content = <Browse />;
   } else if (waitingForQuery) {
-    content = <Skeleton label="Searching TMDB" lines={5} />;
+    content = <Skeleton label={t("discover.searching")} lines={5} />;
   } else {
     content = <SearchResults query={settledQuery} />;
   }
@@ -408,13 +440,14 @@ export const Discover = () => {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Discover</h1>
+        <h1 className={styles.title}>{t("discover.title")}</h1>
         <div className={styles.search}>
           <SearchField
             autoComplete="off"
-            label="Search"
+            clearLabel={t("arc.search.clear")}
+            label={t("discover.searchLabel")}
             maxLength={200}
-            placeholder="Film, series, or person"
+            placeholder={t("discover.searchPlaceholder")}
             value={query}
             onValueChange={changeQuery}
           />

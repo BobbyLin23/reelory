@@ -7,6 +7,7 @@ import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { useI18n } from "@/i18n/i18n";
 import type { MediaType } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
@@ -27,6 +28,7 @@ export const AddToListDialog = ({
   open,
   tmdbId,
 }: AddToListDialogProps) => {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -54,11 +56,7 @@ export const AddToListDialog = ({
         : removeItem.mutateAsync({ listId, mediaType, tmdbId }));
       await refresh();
     } catch {
-      setError(
-        add
-          ? "We could not add this title to that list. Check your connection and try again."
-          : "We could not remove this title from that list. Check your connection and try again.",
-      );
+      setError(add ? t("addToList.addError") : t("addToList.removeError"));
     }
     setPendingId(null);
   };
@@ -66,16 +64,16 @@ export const AddToListDialog = ({
   let body: ReactNode;
   if (listsQuery.isError) {
     body = (
-      <Alert title="Could not load your lists" tone="danger">
+      <Alert title={t("lists.loadError")} tone="danger">
         <Button type="button" variant="secondary" onClick={() => listsQuery.refetch()}>
-          Try again
+          {t("common.tryAgain")}
         </Button>
       </Alert>
     );
   } else if (listsQuery.isPending) {
-    body = <Skeleton label="Loading your lists" lines={3} />;
+    body = <Skeleton label={t("lists.loading")} lines={3} />;
   } else if (lists.length === 0) {
-    body = <p className={styles.note}>You have no lists yet. Create one below.</p>;
+    body = <p className={styles.note}>{t("addToList.empty")}</p>;
   } else {
     body = (
       <ul className={styles.listRows}>
@@ -83,7 +81,7 @@ export const AddToListDialog = ({
           <li className={styles.listRow} key={list.id}>
             <span className={styles.listRowName}>{list.name}</span>
             <span className={styles.listRowActions}>
-              {list.hasTitle ? <Badge size="sm">Added</Badge> : null}
+              {list.hasTitle ? <Badge size="sm">{t("addToList.added")}</Badge> : null}
               <Button
                 loading={pendingId === list.id}
                 size="sm"
@@ -93,7 +91,7 @@ export const AddToListDialog = ({
                   void changeMembership(list.id, !list.hasTitle);
                 }}
               >
-                {list.hasTitle ? "Remove" : "Add"}
+                {list.hasTitle ? t("common.remove") : t("common.add")}
               </Button>
             </span>
           </li>
@@ -113,8 +111,9 @@ export const AddToListDialog = ({
       }}
     >
       <DialogContent
-        description="A title can sit in several lists. Only you can see them."
-        title="Add to list"
+        closeLabel={t("arc.dialog.close")}
+        description={t("addToList.description")}
+        title={t("addToList.title")}
       >
         <div className={styles.dialogBody}>
           {body}
@@ -124,9 +123,9 @@ export const AddToListDialog = ({
             </p>
           )}
           <div className={styles.dialogCreate}>
-            <h3 className={styles.resultsHeading}>New list</h3>
+            <h3 className={styles.resultsHeading}>{t("addToList.newList")}</h3>
             <ListNameForm
-              submitLabel="Create and add"
+              submitLabel={t("addToList.createAndAdd")}
               onCreated={async (list) => {
                 await changeMembership(list.id, true);
               }}

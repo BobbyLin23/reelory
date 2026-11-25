@@ -14,8 +14,15 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData,
 } from "react-router";
 
+import { clerkZh } from "@/i18n/clerk";
+import { statusErrorKey } from "@/i18n/errors";
+import { I18nProvider, useI18n } from "@/i18n/i18n";
+import type { Locale } from "@/i18n/locale";
+import { DEFAULT_LOCALE, isLocale, requestLocale } from "@/i18n/locale";
+import { translate } from "@/i18n/messages";
 import { setClerkAuthTokenGetter } from "@/utils/clerk-auth";
 
 import type { Route } from "./+types/root";
@@ -24,7 +31,17 @@ import { queryClient } from "./utils/orpc";
 
 export const middleware: Route.MiddlewareFunction[] = [clerkMiddleware()];
 
-export const loader = (args: Route.LoaderArgs) => rootAuthLoader(args);
+export const loader = (args: Route.LoaderArgs) =>
+  rootAuthLoader(args, ({ request }) => ({ locale: requestLocale(request) }));
+
+interface RootData {
+  locale?: Locale;
+}
+
+const useRootLocale = (): Locale => {
+  const data = useRouteLoaderData<RootData>("root");
+  return isLocale(data?.locale) ? data.locale : DEFAULT_LOCALE;
+};
 
 function ClerkApiAuthBridge() {
   const { getToken } = useAuth();
@@ -43,17 +60,19 @@ function ClerkApiAuthBridge() {
 export const links: Route.LinksFunction = () => [
   { href: "/favicon.svg", rel: "icon", type: "image/svg+xml" },
   { href: "/favicon.ico", rel: "icon", sizes: "any" },
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+  { href: "https://fonts.googleapis.com", rel: "preconnect" },
+  { crossOrigin: "anonymous", href: "https://fonts.gstatic.com", rel: "preconnect" },
   {
-    rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    rel: "stylesheet",
   },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const locale = useRootLocale();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -69,9 +88,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App({ loaderData }: Route.ComponentProps) {
+function AppProviders({ loaderData }: { loaderData: Route.ComponentProps["loaderData"] }) {
+  const { locale } = useI18n();
+
   return (
-    <ClerkProvider loaderData={loaderData}>
+    <ClerkProvider loaderData={loaderData} localization={locale === "zh-CN" ? clerkZh : undefined}>
       <ClerkApiAuthBridge />
       <QueryClientProvider client={queryClient}>
         <ThemeProvider
@@ -89,24 +110,35 @@ export default function App({ loaderData }: Route.ComponentProps) {
   );
 }
 
+export default function App({ loaderData }: Route.ComponentProps) {
+  return (
+    <I18nProvider locale={loaderData.locale}>
+      <AppProviders loaderData={loaderData} />
+    </I18nProvider>
+  );
+}
+
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  const locale = useRootLocale();
+  let message = translate(locale, "errors.title");
+  let details = translate(locale, "errors.description");
   let stack: string | undefined;
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
+    message = error.status === 404 ? "404" : translate(locale, "errors.label");
     details =
-      error.status === 404 ? "The requested page could not be found." : error.statusText || details;
+      error.status === 404
+        ? translate(locale, "errors.notFoundDescription")
+        : translate(locale, statusErrorKey(error.status));
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
     stack = error.stack;
   }
   return (
-    <main className="pt-16 p-4 container mx-auto">
+    <main className="container mx-auto p-4 pt-16">
       <h1>{message}</h1>
       <p>{details}</p>
       {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
+        <pre className="w-full overflow-x-auto p-4">
           <code>{stack}</code>
         </pre>
       )}

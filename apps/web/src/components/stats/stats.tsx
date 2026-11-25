@@ -11,6 +11,8 @@ import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { PageIntro } from "@/components/page-intro";
+import { useI18n } from "@/i18n/i18n";
+import type { Locale } from "@/i18n/locale";
 import { orpc } from "@/utils/orpc";
 
 import styles from "./stats.module.css";
@@ -31,25 +33,18 @@ type StatsState =
   | { status: "error"; retry: () => Promise<unknown> }
   | { status: "ready"; data: MonthlyStats };
 
-const MONTH_LABEL = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  timeZone: "UTC",
-  year: "numeric",
-});
-const DAY_LABEL = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  month: "long",
-  timeZone: "UTC",
-});
-const DAY_AXIS = new Intl.DateTimeFormat("en-US", {
-  day: "numeric",
-  timeZone: "UTC",
-});
+const monthFormatter = (locale: Locale) =>
+  new Intl.DateTimeFormat(locale, { month: "long", timeZone: "UTC", year: "numeric" });
+const dayFormatter = (locale: Locale) =>
+  new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", timeZone: "UTC" });
+const axisFormatter = (locale: Locale) =>
+  new Intl.DateTimeFormat(locale, { day: "numeric", timeZone: "UTC" });
 
 const monthDate = (month: string) =>
   new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1));
 
-const monthLabel = (month: string) => MONTH_LABEL.format(monthDate(month));
+const monthLabel = (month: string, locale: Locale) =>
+  monthFormatter(locale).format(monthDate(month));
 
 const shiftMonth = (month: string, offset: number) => {
   const date = monthDate(month);
@@ -68,15 +63,16 @@ const StatsHeader = ({
   month: string;
   onMonthChange: (month: string) => void;
 }) => {
+  const { locale, t } = useI18n();
   const previous = shiftMonth(month, -1);
   const next = shiftMonth(month, 1);
 
   return (
     <header className={styles.header}>
-      <PageIntro title="Stats" description="What you watched, one month at a time." />
-      <nav aria-label="Month" className={styles.monthSwitcher}>
+      <PageIntro title={t("stats.title")} description={t("stats.description")} />
+      <nav aria-label={t("stats.monthNav")} className={styles.monthSwitcher}>
         <Button
-          aria-label={`Show ${monthLabel(previous)}`}
+          aria-label={t("stats.showMonth", { month: monthLabel(previous, locale) })}
           type="button"
           variant="secondary"
           onClick={() => onMonthChange(previous)}
@@ -84,10 +80,10 @@ const StatsHeader = ({
           <ChevronLeft aria-hidden="true" size={16} strokeWidth={1.75} />
         </Button>
         <p aria-live="polite" className={styles.month}>
-          {monthLabel(month)}
+          {monthLabel(month, locale)}
         </p>
         <Button
-          aria-label={`Show ${monthLabel(next)}`}
+          aria-label={t("stats.showMonth", { month: monthLabel(next, locale) })}
           disabled={next > latestMonth}
           type="button"
           variant="secondary"
@@ -100,106 +96,135 @@ const StatsHeader = ({
   );
 };
 
-const StatsLoading = () => (
-  <>
-    <section aria-busy="true" aria-label="Monthly totals" className={styles.metrics}>
-      {[0, 1, 2, 3].map((key) => (
-        <div className={styles.metricSkeleton} key={key}>
-          <Skeleton lines={3} />
-        </div>
-      ))}
-    </section>
-    <section aria-busy="true" aria-label="Monthly charts" className={styles.charts}>
-      {[0, 1, 2].map((key) => (
-        <section className={styles.panel} key={key}>
-          <Skeleton lines={5} />
-        </section>
-      ))}
-    </section>
-  </>
-);
+const StatsLoading = () => {
+  const { t } = useI18n();
 
-const StatsEmpty = ({ label }: { label: string }) => (
-  <section aria-label="No watches this month" className={styles.panel}>
-    <EmptyState
-      action={
-        <Link className={styles.browse} to="/discover">
-          Find something to watch
-          <ArrowRight aria-hidden="true" size={16} strokeWidth={1.75} />
-        </Link>
-      }
-      description="Watches dated this month appear here. Log one from any title, or browse Discover."
-      icon={<Clapperboard aria-hidden="true" size={20} strokeWidth={1.75} />}
-      title={`Nothing watched in ${label}`}
-    />
-  </section>
-);
+  return (
+    <>
+      <section aria-busy="true" aria-label={t("stats.loadingTotals")} className={styles.metrics}>
+        {[0, 1, 2, 3].map((key) => (
+          <div className={styles.metricSkeleton} key={key}>
+            <Skeleton label={t("stats.loadingTotals")} lines={3} />
+          </div>
+        ))}
+      </section>
+      <section aria-busy="true" aria-label={t("stats.loadingCharts")} className={styles.charts}>
+        {[0, 1, 2].map((key) => (
+          <section className={styles.panel} key={key}>
+            <Skeleton label={t("stats.loadingCharts")} lines={5} />
+          </section>
+        ))}
+      </section>
+    </>
+  );
+};
+
+const StatsEmpty = ({ label }: { label: string }) => {
+  const { t } = useI18n();
+
+  return (
+    <section aria-label={t("stats.emptyRegion")} className={styles.panel}>
+      <EmptyState
+        action={
+          <Link className={styles.browse} to="/discover">
+            {t("stats.browse")}
+            <ArrowRight aria-hidden="true" size={16} strokeWidth={1.75} />
+          </Link>
+        }
+        description={t("stats.emptyDescription")}
+        icon={<Clapperboard aria-hidden="true" size={20} strokeWidth={1.75} />}
+        title={t("stats.emptyTitle", { month: label })}
+      />
+    </section>
+  );
+};
 
 const StatsCharts = ({ data, label }: { data: MonthlyStats; label: string }) => {
+  const { locale, t } = useI18n();
   const rated = data.ratings.some(({ watches }) => watches > 0);
   const period = label;
+  const day = dayFormatter(locale);
+  const axis = axisFormatter(locale);
 
   return (
     <div className={styles.charts}>
       <section aria-labelledby="watches-by-day" className={styles.panel}>
         <h2 className={styles.heading} id="watches-by-day">
-          Watches by day
+          {t("stats.watchesByDay")}
         </h2>
         <BarChart
-          categoryLabel="Day"
-          data={data.days.map(({ day, watches }) => ({
-            axisLabel: DAY_AXIS.format(dateOf(day)),
-            key: day,
-            label: DAY_LABEL.format(dateOf(day)),
+          categoryLabel={t("stats.day")}
+          data={data.days.map(({ day: key, watches }) => ({
+            axisLabel: axis.format(dateOf(key)),
+            key,
+            label: day.format(dateOf(key)),
             value: watches,
           }))}
-          label="Watches by day"
+          label={t("stats.watchesByDay")}
+          labels={{
+            explore: t("stats.exploreByDay"),
+            highest: t("arc.bar.highest"),
+            lowest: t("arc.bar.lowest"),
+            noData: t("arc.bar.noData"),
+          }}
           period={period}
-          unit="watches"
+          unit={t("stats.watchesUnit")}
         />
       </section>
       <section aria-labelledby="titles-by-genre" className={styles.panel}>
         <h2 className={styles.heading} id="titles-by-genre">
-          Genres
+          {t("stats.genres")}
         </h2>
         {data.genres.length === 0 ? (
-          <p className={styles.note}>No saved genres for these titles.</p>
+          <p className={styles.note}>{t("stats.noGenres")}</p>
         ) : (
           <BarChart
-            averageLabel="Average per genre"
-            categoryLabel="Genre"
+            averageLabel={t("stats.averagePerGenre")}
+            categoryLabel={t("stats.genre")}
             data={data.genres.map(({ genre, titles }) => ({
               axisLabel: genre,
               key: genre,
               label: genre,
               value: titles,
             }))}
-            label="Titles by genre"
+            label={t("stats.titlesByGenre")}
+            labels={{
+              explore: t("stats.exploreByGenre"),
+              highest: t("arc.bar.highest"),
+              lowest: t("arc.bar.lowest"),
+              noData: t("arc.bar.noData"),
+            }}
             period={period}
-            unit="titles"
+            unit={t("stats.titlesUnit")}
           />
         )}
       </section>
       <section aria-labelledby="rated-watches" className={styles.panel}>
         <h2 className={styles.heading} id="rated-watches">
-          Ratings
+          {t("stats.ratings")}
         </h2>
         {rated ? (
           <BarChart
-            averageLabel="Average per score"
-            categoryLabel="Rating"
+            averageLabel={t("stats.averagePerScore")}
+            categoryLabel={t("stats.rating")}
             data={data.ratings.map(({ rating, watches }) => ({
               axisLabel: String(rating),
               key: `rating-${rating}`,
-              label: `${rating} out of 10`,
+              label: t("stats.outOf10", { rating }),
               value: watches,
             }))}
-            label="Rated watches by score"
+            label={t("stats.ratedWatches")}
+            labels={{
+              explore: t("stats.exploreByRating"),
+              highest: t("arc.bar.highest"),
+              lowest: t("arc.bar.lowest"),
+              noData: t("arc.bar.noData"),
+            }}
             period={period}
-            unit="watches"
+            unit={t("stats.watchesUnit")}
           />
         ) : (
-          <p className={styles.note}>No ratings this month.</p>
+          <p className={styles.note}>{t("stats.noRatings")}</p>
         )}
       </section>
     </div>
@@ -207,22 +232,26 @@ const StatsCharts = ({ data, label }: { data: MonthlyStats; label: string }) => 
 };
 
 const StatsContent = ({ data }: { data: MonthlyStats }) => {
-  const label = monthLabel(data.month);
+  const { locale, t } = useI18n();
+  const label = monthLabel(data.month, locale);
   const empty = data.titlesWatched === 0;
+  const share = t("count.ofTitles", { count: data.titlesWatched });
 
   return (
     <>
-      <section aria-label="Monthly totals" className={styles.metrics}>
-        <MetricCard context={label} label="Titles watched" value={data.titlesWatched} />
-        <MetricCard context={`of ${data.titlesWatched} titles`} label="Films" value={data.films} />
+      <section aria-label={t("stats.loadingTotals")} className={styles.metrics}>
         <MetricCard
-          context={`of ${data.titlesWatched} titles`}
-          label="Series"
-          value={data.series}
+          context={label}
+          label={t("stats.titlesWatched")}
+          locale={locale}
+          value={data.titlesWatched}
         />
+        <MetricCard context={share} label={t("stats.films")} locale={locale} value={data.films} />
+        <MetricCard context={share} label={t("stats.series")} locale={locale} value={data.series} />
         <MetricCard
-          context="Not in any month"
-          label="Undated watches"
+          context={t("stats.undatedContext")}
+          label={t("stats.undatedWatches")}
+          locale={locale}
           value={data.undatedWatches}
         />
       </section>
@@ -242,13 +271,14 @@ export const MonthlyStatsView = ({
   onMonthChange: (month: string) => void;
   state: StatsState;
 }) => {
+  const { t } = useI18n();
   let content: ReactNode;
   if (state.status === "error") {
     content = (
-      <Alert title="Monthly stats could not load" tone="danger">
-        <p>Check your connection and try again.</p>
+      <Alert title={t("stats.errorTitle")} tone="danger">
+        <p>{t("stats.errorHelp")}</p>
         <Button type="button" variant="secondary" onClick={() => state.retry()}>
-          Try again
+          {t("common.tryAgain")}
         </Button>
       </Alert>
     );

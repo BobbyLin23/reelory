@@ -58,10 +58,20 @@ export interface CarouselProps {
   interval?: number;
   /** Starts rotating on mount. Off by default, so motion begins with the viewer. */
   autoplay?: boolean;
+  /** Localized copy for the slide controls and (when `slideLabel` is not given) each slide's position. */
+  labels?: Partial<{
+    slides: string;
+    chooseSlide: string;
+    previousSlide: string;
+    nextSlide: string;
+    pauseRotation: string;
+    startRotation: string;
+    slide: string;
+  }>;
   className?: string;
 }
 
-type Drag = {
+interface Drag {
   pointer: number;
   startX: number;
   startY: number;
@@ -70,18 +80,18 @@ type Drag = {
   locked: "x" | "y" | null;
   caught: boolean;
   samples: [number, number][];
-};
+}
 
 /** Movement before a press is read as a drag or handed to the page as a vertical scroll. */
 const SLOP = 6;
 /** Release speed in px/s that always moves at least one slide. */
 const FLICK = 360;
 /** Width of a resting dot and of the active pill, in px. */
-const DOT = 6,
-  PILL = 22;
+const DOT = 6;
+const PILL = 22;
 /** Scale and opacity of a slide one full step from the center. */
-const SCALE = 0.9,
-  DIM = 0.5;
+const DIM = 0.5,
+  SCALE = 0.9;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 /** Momentum projection with a paging deceleration rate: where a flick would come to rest. */
 const project = (velocity: number, rate = 0.995) => ((velocity / 1000) * rate) / (1 - rate);
@@ -90,30 +100,31 @@ const rubber = (overshoot: number, dimension: number) =>
   (overshoot * dimension * 0.55) / (dimension + 0.55 * overshoot);
 const unrubber = (distance: number, dimension: number) =>
   (distance * dimension) / (0.55 * Math.max(1, dimension - distance));
-const defaultSlideLabel = (index: number, count: number) => `${index + 1} of ${count}`;
 const subscribeNothing = () => () => {};
 
 const iconIn: TargetAndTransition = {
+  filter: `blur(${motionTokens.blur.subtle}px)`,
   opacity: 0,
   scale: 0.6,
-  filter: `blur(${motionTokens.blur.subtle}px)`,
 };
-const iconRest: TargetAndTransition = { opacity: 1, scale: 1, filter: "blur(0px)" };
+const iconRest: TargetAndTransition = { filter: "blur(0px)", opacity: 1, scale: 1 };
 const iconOut: TargetAndTransition = {
   ...iconIn,
   transition: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.standard] },
 };
 const iconEnter = {
   ...motionTokens.spring.snappy,
-  opacity: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.enter] },
   filter: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.enter] },
+  opacity: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.enter] },
 } as const;
 
 function velocityOf(samples: [number, number][], now: number) {
   const recent = samples.filter(([time]) => now - time <= 90);
-  if (recent.length < 2 || now - recent[recent.length - 1]![0] > 50) return 0;
-  const [firstTime, firstX] = recent[0]!,
-    [lastTime, lastX] = recent[recent.length - 1]!;
+  if (recent.length < 2 || now - recent.at(-1)![0] > 50) {
+    return 0;
+  }
+  const [firstTime, firstX] = recent[0]!;
+  const [lastTime, lastX] = recent.at(-1)!;
   return lastTime > firstTime ? (lastX - firstX) / ((lastTime - firstTime) / 1000) : 0;
 }
 
@@ -124,11 +135,28 @@ export function Carousel({
   defaultIndex = 0,
   onIndexChange,
   slideSize = "min(80cqw, 340px)",
-  slideLabel = defaultSlideLabel,
+  slideLabel,
+  labels: labelOverrides,
   interval,
   autoplay = false,
   className,
 }: CarouselProps) {
+  const labels = {
+    chooseSlide: "Choose a slide",
+    nextSlide: "Next slide",
+    pauseRotation: "Pause slide rotation",
+    previousSlide: "Previous slide",
+    slide: "{position} of {count}",
+    slides: "Slides",
+    startRotation: "Start slide rotation",
+    ...labelOverrides,
+  };
+  const labelForSlide =
+    slideLabel ??
+    ((position: number, total: number) =>
+      labels.slide
+        .replaceAll("{position}", String(position + 1))
+        .replaceAll("{count}", String(total)));
   const slides = Children.toArray(children);
   const count = slides.length;
   const last = Math.max(0, count - 1);
@@ -168,10 +196,10 @@ export function Carousel({
   const running =
     canRotate && playing && !hovered && !focusPaused && !dragging && inView && pageVisible;
 
-  const bounds = () => ({ min: -last * metrics.current.step, max: 0 });
+  const bounds = () => ({ max: 0, min: -last * metrics.current.step });
   const band = (raw: number) => {
-    const { min, max } = bounds(),
-      size = metrics.current.width || 1;
+    const { min, max } = bounds();
+    const size = metrics.current.width || 1;
     return raw > max
       ? max + rubber(raw - max, size)
       : raw < min
@@ -179,8 +207,8 @@ export function Carousel({
         : raw;
   };
   const unband = (shown: number) => {
-    const { min, max } = bounds(),
-      size = metrics.current.width || 1;
+    const { min, max } = bounds();
+    const size = metrics.current.width || 1;
     return shown > max
       ? max + unrubber(shown - max, size)
       : shown < min
@@ -193,7 +221,9 @@ export function Carousel({
     const { step } = metrics.current;
     travel.current?.stop();
     travel.current = null;
-    if (!step) return;
+    if (!step) {
+      return;
+    }
     if (reduced) {
       x.jump(-to * step);
       return;
@@ -208,17 +238,25 @@ export function Carousel({
     const next = clamp(to, 0, last);
     target.current = next;
     glide(next, velocity);
-    if (next === index) return;
-    if (controlledIndex === undefined) setOwnIndex(next);
+    if (next === index) {
+      return;
+    }
+    if (controlledIndex === undefined) {
+      setOwnIndex(next);
+    }
     onIndexChange?.(next);
-    if (announce) setAnnouncement(slideLabel(next, count));
+    if (announce) {
+      setAnnouncement(labelForSlide(next, count));
+    }
   }
 
   const measure = useEffectEvent(() => {
-    const track = trackRef.current,
-      viewport = viewportRef.current;
-    const [first, second] = Array.from(track?.children ?? []) as HTMLElement[];
-    if (!track || !viewport || !first) return;
+    const track = trackRef.current;
+    const viewport = viewportRef.current;
+    const [first, second] = [...(track?.children ?? [])] as HTMLElement[];
+    if (!track || !viewport || !first) {
+      return;
+    }
     // Centers are unaffected by each slide's scale, and rects keep the sub-pixel step that offsetLeft would round away.
     const center = (node: HTMLElement) => {
       const rect = node.getBoundingClientRect();
@@ -240,7 +278,9 @@ export function Carousel({
   useLayoutEffect(() => {
     measure();
     const viewport = viewportRef.current;
-    if (!viewport || typeof ResizeObserver === "undefined") return;
+    if (!viewport || typeof ResizeObserver === "undefined") {
+      return;
+    }
     const observer = new ResizeObserver(() => measure());
     observer.observe(viewport);
     return () => observer.disconnect();
@@ -251,12 +291,15 @@ export function Carousel({
     () =>
       x.on("change", (value) => {
         const { step } = metrics.current;
-        if (!step) return;
+        if (!step) {
+          return;
+        }
         const position = -value / step;
         progress.set(position);
         drains.forEach((drain, i) => {
-          if (i !== target.current && Math.abs(position - i) >= 1 && drain.get() !== 0)
+          if (i !== target.current && Math.abs(position - i) >= 1 && drain.get() !== 0) {
             drain.jump(0);
+          }
         });
       }),
     [x, progress, drains],
@@ -274,9 +317,13 @@ export function Carousel({
 
   const advance = useEffectEvent(() => select(index >= last ? 0 : index + 1, { announce: false }));
   useEffect(() => {
-    if (!running || !interval) return;
+    if (!running || !interval) {
+      return;
+    }
     const drain = drains[index];
-    if (!drain) return;
+    if (!drain) {
+      return;
+    }
     // motion: the autoplay progress drains over the product interval, a timer rather than interface motion
     const controls = animate(drain, 1, {
       duration: ((1 - drain.get()) * interval) / 1000,
@@ -288,12 +335,16 @@ export function Carousel({
 
   useEffect(() => {
     const root = rootRef.current;
-    if (!interval || !root) return;
+    if (!interval || !root) {
+      return;
+    }
     const observer =
       typeof IntersectionObserver === "undefined"
         ? null
         : new IntersectionObserver(([entry]) => {
-            if (entry) setInView(entry.isIntersecting);
+            if (entry) {
+              setInView(entry.isIntersecting);
+            }
           });
     observer?.observe(root);
     const onVisibility = () => setPageVisible(document.visibilityState !== "hidden");
@@ -307,8 +358,12 @@ export function Carousel({
   // A horizontal trackpad swipe moves the track 1:1 and settles on the nearest slide once the swipe, including its momentum, ends.
   const onWheel = useEffectEvent((event: WheelEvent) => {
     const state = wheel.current;
-    if (count < 2 || drag.current || !metrics.current.step) return;
-    if (!state.active && Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+    if (count < 2 || drag.current || !metrics.current.step) {
+      return;
+    }
+    if (!state.active && Math.abs(event.deltaX) <= Math.abs(event.deltaY)) {
+      return;
+    }
     event.preventDefault();
     if (!state.active) {
       state.active = true;
@@ -325,9 +380,11 @@ export function Carousel({
     }, 120);
   });
   useEffect(() => {
-    const viewport = viewportRef.current,
-      state = wheel.current;
-    if (!viewport) return;
+    const viewport = viewportRef.current;
+    const state = wheel.current;
+    if (!viewport) {
+      return;
+    }
     const listener = (event: WheelEvent) => onWheel(event);
     viewport.addEventListener("wheel", listener, { passive: false });
     return () => {
@@ -337,12 +394,12 @@ export function Carousel({
   }, []);
 
   function slideAt(clientX: number) {
-    const nodes = Array.from(trackRef.current?.children ?? []);
+    const nodes = [...(trackRef.current?.children ?? [])];
     const hit = nodes.findIndex((node) => {
       const rect = node.getBoundingClientRect();
       return clientX >= rect.left && clientX <= rect.right;
     });
-    return hit < 0 ? null : hit;
+    return hit === -1 ? null : hit;
   }
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
@@ -351,8 +408,9 @@ export function Carousel({
       drag.current ||
       !metrics.current.step ||
       (event.pointerType === "mouse" && event.button !== 0)
-    )
+    ) {
       return;
+    }
     swallowClick.current = false;
     // Touching a visibly moving track catches it where it is, the way a hand stops a spinning wheel. A settling tail is left alone so a tap still selects.
     const caught =
@@ -364,24 +422,28 @@ export function Carousel({
       travel.current = null;
     }
     drag.current = {
-      pointer: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      origin: 0,
+      caught,
       from: target.current,
       locked: null,
-      caught,
+      origin: 0,
+      pointer: event.pointerId,
       samples: [],
+      startX: event.clientX,
+      startY: event.clientY,
     };
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
-    const current = drag.current;
-    if (!current || current.pointer !== event.pointerId) return;
+    const { current } = drag;
+    if (!current || current.pointer !== event.pointerId) {
+      return;
+    }
     if (!current.locked) {
-      const dx = event.clientX - current.startX,
-        dy = event.clientY - current.startY;
-      if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
+      const dx = event.clientX - current.startX;
+      const dy = event.clientY - current.startY;
+      if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) {
+        return;
+      }
       if (Math.abs(dy) > Math.abs(dx)) {
         current.locked = "y";
         return;
@@ -395,15 +457,21 @@ export function Carousel({
       event.currentTarget.setPointerCapture(event.pointerId);
       setDragging(true);
     }
-    if (current.locked !== "x") return;
+    if (current.locked !== "x") {
+      return;
+    }
     x.set(band(current.origin + event.clientX - current.startX));
     current.samples.push([event.timeStamp, event.clientX]);
-    if (current.samples.length > 16) current.samples.shift();
+    if (current.samples.length > 16) {
+      current.samples.shift();
+    }
   }
 
   function finish(event: ReactPointerEvent<HTMLDivElement>, cancelled: boolean) {
-    const current = drag.current;
-    if (!current || current.pointer !== event.pointerId) return;
+    const { current } = drag;
+    if (!current || current.pointer !== event.pointerId) {
+      return;
+    }
     drag.current = null;
     const { step } = metrics.current;
     if (current.locked === "x") {
@@ -414,12 +482,14 @@ export function Carousel({
       let to = Math.round(-(x.get() + project(velocity)) / step);
       if (Math.abs(velocity) > FLICK) {
         const direction = velocity < 0 ? 1 : -1;
-        if ((to - current.from) * direction < 1) to = current.from + direction;
+        if ((to - current.from) * direction < 1) {
+          to = current.from + direction;
+        }
       }
       // Inside the bounds the track moves 1:1 with the pointer, so the sampled release speed carries into the spring even when the
       // last move landed a frame early (the value's own velocity reads zero after 30ms). Past an edge, the banded value speed is the true one.
-      const { min, max } = bounds(),
-        shown = x.get();
+      const { min, max } = bounds();
+      const shown = x.get();
       select(to, { velocity: shown >= min && shown <= max ? velocity : x.getVelocity() });
     } else if (current.caught) {
       swallowClick.current = true;
@@ -436,9 +506,13 @@ export function Carousel({
   }
 
   function onKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
-    if (event.altKey || event.ctrlKey || event.metaKey || count < 2) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || count < 2) {
+      return;
+    }
     const node = event.target as HTMLElement;
-    if (node.closest("input, textarea, select, [contenteditable]")) return;
+    if (node.closest("input, textarea, select, [contenteditable]")) {
+      return;
+    }
     const from = target.current;
     const to =
       event.key === "ArrowLeft"
@@ -450,12 +524,17 @@ export function Carousel({
             : event.key === "End"
               ? last
               : null;
-    if (to === null) return;
+    if (to === null) {
+      return;
+    }
     event.preventDefault();
     const next = clamp(to, 0, last);
     select(next);
-    if (node.getAttribute("role") === "tab") tabRefs.current[next]?.focus({ preventScroll: true });
-    else if (trackRef.current?.contains(node)) viewportRef.current?.focus({ preventScroll: true });
+    if (node.getAttribute("role") === "tab") {
+      tabRefs.current[next]?.focus({ preventScroll: true });
+    } else if (trackRef.current?.contains(node)) {
+      viewportRef.current?.focus({ preventScroll: true });
+    }
   }
 
   function toggleRotation() {
@@ -467,12 +546,14 @@ export function Carousel({
     setPlaying(false);
     // Pausing refills the pill: this slide stays until the viewer moves on.
     if (drain) {
-      if (reduced) drain.jump(0);
-      else
+      if (reduced) {
+        drain.jump(0);
+      } else {
         animate(drain, 0, {
           duration: motionTokens.duration.standard,
           ease: [...motionTokens.ease.standard],
         });
+      }
     }
   }
 
@@ -493,15 +574,16 @@ export function Carousel({
         setFocusPaused(event.target !== playRef.current && event.target.matches(":focus-visible"))
       }
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setFocusPaused(false);
+        }
       }}
     >
       <div
         ref={viewportRef}
         className={styles.viewport}
         role="group"
-        aria-label="Slides"
+        aria-label={labels.slides}
         tabIndex={0}
         data-dragging={dragging || undefined}
         onPointerDown={onPointerDown}
@@ -509,7 +591,9 @@ export function Carousel({
         onPointerUp={(event) => finish(event, false)}
         onPointerCancel={(event) => finish(event, true)}
         onPointerEnter={(event) => {
-          if (event.pointerType === "mouse") setHovered(true);
+          if (event.pointerType === "mouse") {
+            setHovered(true);
+          }
         }}
         onPointerLeave={() => setHovered(false)}
         onClickCapture={(event) => {
@@ -529,7 +613,7 @@ export function Carousel({
               index={i}
               progress={progress}
               active={i === index}
-              label={slideLabel(i, count)}
+              label={labelForSlide(i, count)}
             >
               {slide}
             </Slide>
@@ -543,7 +627,7 @@ export function Carousel({
               ref={playRef}
               type="button"
               className={styles.control}
-              aria-label={playing ? "Pause slide rotation" : "Start slide rotation"}
+              aria-label={playing ? labels.pauseRotation : labels.startRotation}
               onClick={toggleRotation}
             >
               <span className={styles.iconSlot}>
@@ -570,7 +654,7 @@ export function Carousel({
               </span>
             </button>
           )}
-          <div className={styles.tabs} role="tablist" aria-label="Choose a slide">
+          <div className={styles.tabs} role="tablist" aria-label={labels.chooseSlide}>
             {slides.map((_, i) => (
               <Dot
                 key={i}
@@ -579,7 +663,7 @@ export function Carousel({
                 progress={progress}
                 drain={drains[i]!}
                 selected={i === index}
-                label={slideLabel(i, count)}
+                label={labelForSlide(i, count)}
                 controls={`${id}-slide-${i}`}
                 tabRef={(node) => {
                   tabRefs.current[i] = node;
@@ -592,10 +676,12 @@ export function Carousel({
             <button
               type="button"
               className={styles.control}
-              aria-label="Previous slide"
+              aria-label={labels.previousSlide}
               aria-disabled={index === 0}
               onClick={() => {
-                if (target.current > 0) select(target.current - 1);
+                if (target.current > 0) {
+                  select(target.current - 1);
+                }
               }}
             >
               <ChevronLeft size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -603,10 +689,12 @@ export function Carousel({
             <button
               type="button"
               className={styles.control}
-              aria-label="Next slide"
+              aria-label={labels.nextSlide}
               aria-disabled={index === last}
               onClick={() => {
-                if (target.current < last) select(target.current + 1);
+                if (target.current < last) {
+                  select(target.current + 1);
+                }
               }}
             >
               <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
@@ -647,7 +735,7 @@ function Slide({
       aria-roledescription="slide"
       aria-label={label}
       inert={!active}
-      style={{ scale, opacity }}
+      style={{ opacity, scale }}
     >
       {children}
     </motion.div>

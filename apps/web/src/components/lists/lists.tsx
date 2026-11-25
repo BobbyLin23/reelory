@@ -11,6 +11,9 @@ import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { PageIntro } from "@/components/page-intro";
+import { useI18n } from "@/i18n/i18n";
+import type { Locale } from "@/i18n/locale";
+import { translate } from "@/i18n/messages";
 import { tmdbImageUrl } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
@@ -20,8 +23,8 @@ import { listTitleKey, useListTitles } from "./use-list-titles";
 
 import styles from "./lists.module.css";
 
-export const countLabel = (count: number) =>
-  count === 0 ? "No titles yet" : `${count} ${count === 1 ? "title" : "titles"}`;
+export const countLabel = (count: number, locale: Locale) =>
+  count === 0 ? translate(locale, "count.noTitles") : translate(locale, "count.titles", { count });
 
 const Collage = ({
   preview,
@@ -62,19 +65,24 @@ const ListCard = ({
 }: {
   list: ListSummary;
   titles: Map<string, ListTitle | null>;
-}) => (
-  <li>
-    <Link className={styles.listCard} to={`/lists/${list.id}`}>
-      <Collage preview={list.preview} titles={titles} />
-      <span className={styles.listCardCopy}>
-        <span className={styles.listCardName}>{list.name}</span>
-        <span className={styles.meta}>{countLabel(list.itemCount)}</span>
-      </span>
-    </Link>
-  </li>
-);
+}) => {
+  const { locale } = useI18n();
+
+  return (
+    <li>
+      <Link className={styles.listCard} to={`/lists/${list.id}`}>
+        <Collage preview={list.preview} titles={titles} />
+        <span className={styles.listCardCopy}>
+          <span className={styles.listCardName}>{list.name}</span>
+          <span className={styles.meta}>{countLabel(list.itemCount, locale)}</span>
+        </span>
+      </Link>
+    </li>
+  );
+};
 
 export const Lists = () => {
+  const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
   const listsQuery = useQuery(orpc.lists.overview.queryOptions());
   const lists: ListSummary[] = listsQuery.data ?? [];
@@ -82,9 +90,9 @@ export const Lists = () => {
 
   const header = (
     <header className={styles.pageHeader}>
-      <PageIntro description="Collections only you can see." title="Lists" />
+      <PageIntro description={t("lists.description")} title={t("lists.title")} />
       <Button type="button" onClick={() => setCreateOpen(true)}>
-        New list
+        {t("lists.new")}
       </Button>
     </header>
   );
@@ -92,20 +100,20 @@ export const Lists = () => {
   let body: ReactNode;
   if (listsQuery.isError) {
     body = (
-      <Alert title="Could not load your lists" tone="danger">
+      <Alert title={t("lists.loadError")} tone="danger">
         <Button type="button" variant="secondary" onClick={() => listsQuery.refetch()}>
-          Try again
+          {t("common.tryAgain")}
         </Button>
       </Alert>
     );
   } else if (listsQuery.isPending) {
-    body = <Skeleton label="Loading your lists" lines={6} />;
+    body = <Skeleton label={t("lists.loading")} lines={6} />;
   } else if (lists.length === 0) {
     body = (
       <EmptyState
-        description="Choose New list to group films and series for a marathon, a genre, or a mood."
+        description={t("lists.emptyDescription")}
         icon={<ListVideo aria-hidden="true" size={20} />}
-        title="No lists yet"
+        title={t("lists.emptyTitle")}
       />
     );
   } else {
@@ -124,8 +132,9 @@ export const Lists = () => {
       {body}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent
-          description="Name it for a mood, a genre, or a marathon. You can rename it later."
-          title="New list"
+          closeLabel={t("arc.dialog.close")}
+          description={t("lists.createDescription")}
+          title={t("lists.createTitle")}
         >
           <ListNameForm
             onCreated={() => {

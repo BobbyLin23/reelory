@@ -12,17 +12,22 @@ export interface SearchFieldProps extends Omit<InputHTMLAttributes<HTMLInputElem
   label: string;
   value: string;
   onValueChange: (value: string) => void;
+  /** Accessible name for the clear button. */
+  clearLabel?: string;
 }
 export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
-  ({ label, value, onValueChange, id, className, ...props }, ref) => {
+  ({ label, value, onValueChange, clearLabel = "Clear search", id, className, ...props }, ref) => {
     const generated = useId();
     const controlId = id ?? generated;
     const reduced = useReducedMotion();
     const inputRef = useRef<HTMLInputElement | null>(null);
     const setRefs = (node: HTMLInputElement | null) => {
       inputRef.current = node;
-      if (typeof ref === "function") ref(node);
-      else if (ref) ref.current = node;
+      if (typeof ref === "function") {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
     };
     // Clearing returns focus to the field, since the clear button unmounts under the pointer.
     function clear() {
@@ -52,20 +57,20 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
                   type="button"
                   tabIndex={0}
                   onClick={clear}
-                  aria-label="Clear search"
+                  aria-label={clearLabel}
                   initial={
                     reduced
                       ? { opacity: 0 }
-                      : { opacity: 0, scale: 0.8, filter: `blur(${motionTokens.blur.subtle}px)` }
+                      : { filter: `blur(${motionTokens.blur.subtle}px)`, opacity: 0, scale: 0.8 }
                   }
-                  animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                  animate={{ filter: "blur(0px)", opacity: 1, scale: 1 }}
                   exit={
                     reduced
                       ? { opacity: 0, transition: { duration: 0 } }
                       : {
+                          filter: `blur(${motionTokens.blur.subtle}px)`,
                           opacity: 0,
                           scale: 0.8,
-                          filter: `blur(${motionTokens.blur.subtle}px)`,
                           transition: {
                             duration: motionTokens.duration.instant,
                             ease: [...motionTokens.ease.standard],
@@ -88,8 +93,8 @@ export const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(
                       ? { duration: motionTokens.duration.instant }
                       : {
                           ...motionTokens.spring.snappy,
-                          opacity: { duration: motionTokens.duration.fast },
                           filter: { duration: motionTokens.duration.fast },
+                          opacity: { duration: motionTokens.duration.fast },
                         }
                   }
                 >

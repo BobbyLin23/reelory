@@ -1,7 +1,12 @@
 import { LibraryHome } from "@/components/library-home/library-home";
+import { pageTitle } from "@/i18n/meta";
 
-export const meta = () => [{ title: "Records · reelory" }];
+import type { Route } from "./+types/_app._index";
 
-const Home = () => <LibraryHome />;
+export const meta: Route.MetaFunction = ({ matches }: Route.MetaArgs) => [
+  { title: pageTitle(matches, "nav.records") },
+];
 
-export default Home;
+const Records = () => <LibraryHome />;
+
+export default Records;

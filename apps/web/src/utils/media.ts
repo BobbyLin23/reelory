@@ -1,18 +1,19 @@
+import type { Locale } from "@/i18n/locale";
+import { translate } from "@/i18n/messages";
+
 const POSTER_PATH = /^\/[\w-]+\.[a-zA-Z0-9]+$/u;
 const YEAR = /^(?<year>\d{4})/u;
 const TMDB_IMAGE = "https://image.tmdb.org/t/p";
 
 export type MediaType = "movie" | "tv";
-export type LibraryStatus = "want" | "watching" | "watched";
+export const LIBRARY_STATUSES = ["want", "watching", "watched"] as const;
+export type LibraryStatus = (typeof LIBRARY_STATUSES)[number];
 
-export const LIBRARY_STATUS_ACTIONS = [
-  { label: "Want", status: "want" },
-  { label: "Watching", status: "watching" },
-  { label: "Watched", status: "watched" },
-] as const satisfies readonly { status: LibraryStatus; label: string }[];
+export const libraryStatusLabel = (status: LibraryStatus, locale: Locale): string =>
+  translate(locale, `status.${status}`);
 
-export const libraryStatusLabel = (status: LibraryStatus) =>
-  LIBRARY_STATUS_ACTIONS.find((action) => action.status === status)?.label ?? status;
+export const isLibraryStatus = (value: string): value is LibraryStatus =>
+  LIBRARY_STATUSES.some((status) => status === value);
 
 export const isMediaType = (value: string | undefined): value is MediaType =>
   value === "movie" || value === "tv";
@@ -35,22 +36,34 @@ export const yearFromDate = (value: string | null): number | null => {
   return year >= 1 && year <= 9999 ? year : null;
 };
 
-export const formatRuntime = (minutes: number | null | undefined): string | null => {
+export const formatRuntime = (
+  minutes: number | null | undefined,
+  locale: Locale,
+): string | null => {
   if (typeof minutes !== "number" || minutes <= 0) {
     return null;
   }
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   if (hours === 0) {
-    return `${rest} min`;
+    return translate(locale, "media.minutes", { minutes: rest });
   }
   if (rest === 0) {
-    return `${hours}h`;
+    return translate(locale, "media.hours", { hours });
   }
-  return `${hours}h ${rest}m`;
+  return translate(locale, "media.hoursMinutes", { hours, minutes: rest });
 };
 
-export const formatVote = (value: number): string => value.toFixed(1);
+const voteFormats: Record<Locale, Intl.NumberFormat> = {
+  en: new Intl.NumberFormat("en", { maximumFractionDigits: 1, minimumFractionDigits: 1 }),
+  "zh-CN": new Intl.NumberFormat("zh-CN", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  }),
+};
+
+export const formatVote = (value: number, locale: Locale): string =>
+  voteFormats[locale].format(value);
 
 export interface EpisodePosition {
   episode: number;
@@ -78,8 +91,8 @@ export const seriesTotals = (
   };
 };
 
-export const formatEpisode = ({ episode, season }: EpisodePosition): string =>
-  `S${season}E${episode}`;
+export const formatEpisode = ({ episode, season }: EpisodePosition, locale: Locale): string =>
+  translate(locale, "media.episodeShort", { episode, season });
 
 /** Orders episodes the way they air: by season first, then by episode. */
 export const compareEpisodes = (left: EpisodePosition, right: EpisodePosition): number =>
@@ -197,27 +210,17 @@ export const starsToRating = (stars: number): number | null => {
 
 export const ratingToStars = (rating: number | null): number => (rating === null ? 0 : rating / 2);
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
+const watchDateFormats: Record<Locale, Intl.DateTimeFormat> = {
+  en: new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric" }),
+  "zh-CN": new Intl.DateTimeFormat("zh-CN", { day: "numeric", month: "short", year: "numeric" }),
+};
 
-export const formatWatchDate = (value: string | null): string | null => {
+export const formatWatchDate = (value: string | null, locale: Locale): string | null => {
   if (value === null) {
     return null;
   }
-  const date = fromIsoDate(value);
-  return `${MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+
+  return watchDateFormats[locale].format(fromIsoDate(value));
 };
 
 /** A 1-10 rating as the half-star value people see, without a trailing zero. */

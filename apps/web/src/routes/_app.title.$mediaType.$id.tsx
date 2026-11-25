@@ -1,21 +1,26 @@
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { TitlePage } from "@/components/title-page/title-page";
+import { useI18n } from "@/i18n/i18n";
+import { pageTitle } from "@/i18n/meta";
 import { isMediaType, parseTmdbId } from "@/utils/media";
 
 import type { Route } from "./+types/_app.title.$mediaType.$id";
 
-export const meta = ({ params }: Route.MetaArgs) => {
-  const kind = params.mediaType === "tv" ? "Series" : "Film";
-  return [{ title: `${kind} · reelory` }];
-};
+export const meta: Route.MetaFunction = ({ matches, params }: Route.MetaArgs) => [
+  {
+    title: pageTitle(matches, params.mediaType === "tv" ? "common.series" : "common.film"),
+  },
+];
 
 const TitleRoute = ({ params }: Route.ComponentProps) => {
+  const { t } = useI18n();
   const tmdbId = parseTmdbId(params.id);
+
   if (!isMediaType(params.mediaType) || tmdbId === null) {
     return (
       <EmptyState
-        description="Use a film or series address such as /title/movie/550."
-        title="This title link is not valid"
+        description={t("errors.invalidTitleDescription")}
+        title={t("errors.invalidTitleTitle")}
       />
     );
   }

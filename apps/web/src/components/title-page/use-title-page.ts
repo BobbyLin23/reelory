@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { useI18n } from "@/i18n/i18n";
+import type { Locale } from "@/i18n/locale";
+import { translate } from "@/i18n/messages";
 import type { LibraryStatus } from "@/utils/media";
 import { formatRuntime, librarySnapshot, tmdbImageUrl, yearFromDate } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
@@ -64,6 +67,7 @@ const useTitleActions = ({
   tmdbId: number;
   year: number | null;
 }) => {
+  const { locale } = useI18n();
   const queryClient = useQueryClient();
   const [pendingStatus, setPendingStatus] = useState<LibraryStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -85,7 +89,7 @@ const useTitleActions = ({
       });
       await queryClient.invalidateQueries({ queryKey: orpc.library.list.key() });
     } catch {
-      setStatusError("We could not update your library. Check your connection and try again.");
+      setStatusError(translate(locale, "errors.updateLibrary"));
     }
     setPendingStatus(null);
   };
@@ -104,12 +108,13 @@ const first = <T>(left: T | undefined, right: T | undefined, fallback: T) =>
 const titleSnapshot = (
   movie: ReturnType<typeof useTitleQueries>["movie"],
   tv: ReturnType<typeof useTitleQueries>["tv"],
+  locale: Locale,
 ) => ({
   backdropUrl: tmdbImageUrl(first(movie?.backdropPath, tv?.backdropPath, null), "w1280"),
   creators: tv?.createdBy ?? [],
   overview: first(movie?.overview, tv?.overview, ""),
   posterPath: first(movie?.posterPath, tv?.posterPath, null),
-  runtimeLabel: formatRuntime(first(movie?.runtime, tv?.episodeRunTime[0], null)),
+  runtimeLabel: formatRuntime(first(movie?.runtime, tv?.episodeRunTime[0], null), locale),
   seasons: tv?.seasons ?? [],
   title: first(movie?.title, tv?.name, ""),
   voteAverage: first(movie?.voteAverage, tv?.voteAverage, 0),
@@ -117,10 +122,11 @@ const titleSnapshot = (
 });
 
 export const useTitlePage = (mediaType: "movie" | "tv", tmdbId: number) => {
+  const { locale } = useI18n();
   const [logOpen, setLogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const queries = useTitleQueries(mediaType, tmdbId);
-  const snapshot = titleSnapshot(queries.movie, queries.tv);
+  const snapshot = titleSnapshot(queries.movie, queries.tv, locale);
   const actions = useTitleActions({
     genres: queries.genres,
     mediaType,

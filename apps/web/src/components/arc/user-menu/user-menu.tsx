@@ -1,5 +1,8 @@
 "use client";
 
+import { ChevronDown, LoaderCircle, LogOut, Monitor, Moon, Sun, SunMoon } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import type { PanInfo, Transition, Variants } from "motion/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type {
   CSSProperties,
@@ -11,10 +14,9 @@ import type {
   Ref,
 } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import type { PanInfo, Transition, Variants } from "motion/react";
-import { ChevronDown, LoaderCircle, LogOut, Monitor, Moon, Sun, SunMoon } from "lucide-react";
+
 import { motionTokens } from "../lib/motion-tokens";
+
 import styles from "./user-menu.module.css";
 
 export type UserStatus = "available" | "busy" | "away";
@@ -22,18 +24,46 @@ export type ThemePreference = "light" | "dark" | "system";
 
 /** Statuses in menu order. Each one has its own dot shape as well as color: solid, barred, or hollow. */
 export const userStatuses: { value: UserStatus; label: string }[] = [
-  { value: "available", label: "Available" },
-  { value: "busy", label: "Busy" },
-  { value: "away", label: "Away" },
+  { label: "Available", value: "available" },
+  { label: "Busy", value: "busy" },
+  { label: "Away", value: "away" },
 ];
 
+export interface UserMenuLabels {
+  account: string;
+  theme: string;
+  signOut: string;
+  signingOut: string;
+  light: string;
+  dark: string;
+  system: string;
+  status: string;
+  available: string;
+  busy: string;
+  away: string;
+}
+
+const defaultLabels: UserMenuLabels = {
+  account: "Account menu",
+  available: "Available",
+  away: "Away",
+  busy: "Busy",
+  dark: "Dark",
+  light: "Light",
+  signOut: "Sign out",
+  signingOut: "Signing out",
+  status: "Status",
+  system: "System",
+  theme: "Theme",
+};
+
 const themes: { value: ThemePreference; label: string; icon: ReactNode }[] = [
-  { value: "light", label: "Light", icon: <Sun size={14} strokeWidth={1.75} aria-hidden="true" /> },
-  { value: "dark", label: "Dark", icon: <Moon size={14} strokeWidth={1.75} aria-hidden="true" /> },
+  { icon: <Sun size={14} strokeWidth={1.75} aria-hidden="true" />, label: "Light", value: "light" },
+  { icon: <Moon size={14} strokeWidth={1.75} aria-hidden="true" />, label: "Dark", value: "dark" },
   {
-    value: "system",
-    label: "System",
     icon: <Monitor size={14} strokeWidth={1.75} aria-hidden="true" />,
+    label: "System",
+    value: "system",
   },
 ];
 
@@ -73,6 +103,8 @@ export interface UserMenuProps {
   items?: UserMenuItem[];
   onSignOut?: () => void | Promise<unknown>;
   signOutKeys?: string[];
+  /** Localized copy for the menu's account, theme, and sign-out controls. */
+  labels?: Partial<UserMenuLabels>;
   align?: "start" | "center" | "end";
   /** Shows the name and a chevron beside the avatar from 640px up. */
   showName?: boolean;
@@ -86,7 +118,12 @@ export interface UserMenuProps {
   className?: string;
 }
 
-type Highlight = { top: number; height: number; tone?: string; glide: boolean };
+interface Highlight {
+  top: number;
+  height: number;
+  tone?: string;
+  glide: boolean;
+}
 type OpenReason = "first" | "last" | "pointer" | null;
 
 const compactQuery = "(max-width: 639px)";
@@ -96,8 +133,6 @@ const subscribeCompact = (change: () => void) => {
   return () => query.removeEventListener("change", change);
 };
 const subscribeNothing = () => () => {};
-const statusLabel = (status: UserStatus) =>
-  userStatuses.find((option) => option.value === status)?.label ?? status;
 const enter = [...motionTokens.ease.enter] as [number, number, number, number];
 const standard = [...motionTokens.ease.standard] as [number, number, number, number];
 const exitEase = [0.4, 0, 1, 1] as [number, number, number, number];
@@ -105,45 +140,45 @@ const exitEase = [0.4, 0, 1, 1] as [number, number, number, number];
 /** The panel grows out of the trigger on a critically damped spring; rows follow a beat later. Closing is a short fade. */
 const panelMotion: Variants = {
   closed: { opacity: 0, scale: 0.94 },
-  open: {
-    opacity: 1,
-    scale: 1,
-    transition: {
-      type: "spring",
-      visualDuration: 0.3,
-      bounce: 0,
-      opacity: { duration: motionTokens.duration.fast, ease: enter },
-      delayChildren: 0.03,
-      staggerChildren: 0.016,
-    },
-  },
   exit: {
     opacity: 0,
     scale: 0.97,
     transition: { duration: motionTokens.duration.instant, ease: exitEase },
   },
+  open: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      bounce: 0,
+      delayChildren: 0.03,
+      opacity: { duration: motionTokens.duration.fast, ease: enter },
+      staggerChildren: 0.016,
+      type: "spring",
+      visualDuration: 0.3,
+    },
+  },
 };
 const sheetMotion: Variants = {
   closed: { y: "100%" },
+  exit: { transition: { duration: motionTokens.duration.standard, ease: exitEase }, y: "100%" },
   open: {
-    y: 0,
     transition: {
       ...motionTokens.spring.smooth,
-      visualDuration: 0.36,
       delayChildren: 0.06,
       staggerChildren: 0.02,
+      visualDuration: 0.36,
     },
+    y: 0,
   },
-  exit: { y: "100%", transition: { duration: motionTokens.duration.standard, ease: exitEase } },
 };
 const stillMotion: Variants = {
   closed: { opacity: 0 },
-  open: { opacity: 1, transition: { duration: motionTokens.duration.instant } },
   exit: { opacity: 0, transition: { duration: motionTokens.duration.instant } },
+  open: { opacity: 1, transition: { duration: motionTokens.duration.instant } },
 };
 const rowMotion: Variants = {
   closed: { opacity: 0, y: 3 },
-  open: { opacity: 1, y: 0, transition: { duration: motionTokens.duration.standard, ease: enter } },
+  open: { opacity: 1, transition: { duration: motionTokens.duration.standard, ease: enter }, y: 0 },
 };
 
 /** A presence mark that morphs between statuses: the color crossfades while a hole opens for away and a bar slides in for busy. */
@@ -215,17 +250,17 @@ function Rise({ text, reduced }: { text: string; reduced: boolean }) {
         initial={
           reduced
             ? { opacity: 0 }
-            : { opacity: 0, y: "0.35em", filter: `blur(${motionTokens.blur.subtle}px)` }
+            : { filter: `blur(${motionTokens.blur.subtle}px)`, opacity: 0, y: "0.35em" }
         }
-        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        animate={{ filter: "blur(0px)", opacity: 1, y: 0 }}
         exit={
           reduced
             ? { opacity: 0, transition: { duration: 0 } }
             : {
-                opacity: 0,
-                y: "-0.35em",
                 filter: `blur(${motionTokens.blur.subtle}px)`,
+                opacity: 0,
                 transition: { duration: motionTokens.duration.fast, ease: standard },
+                y: "-0.35em",
               }
         }
         transition={
@@ -282,7 +317,7 @@ function Segmented<T extends string>({
         className={styles.segments}
         role="group"
         aria-label={label}
-        style={{ "--index": index, "--count": options.length } as CSSProperties}
+        style={{ "--count": options.length, "--index": index } as CSSProperties}
       >
         <span className={styles.thumb} aria-hidden="true" />
         {options.map((option) => (
@@ -305,10 +340,13 @@ function Segmented<T extends string>({
   );
 }
 
-const getStops = (root: HTMLElement | null) =>
-  Array.from(root?.querySelectorAll<HTMLElement>("[data-stop]") ?? []);
+const getStops = (root: HTMLElement | null) => [
+  ...(root?.querySelectorAll<HTMLElement>("[data-stop]") ?? []),
+];
 function focusStop(stop: HTMLElement | undefined) {
-  if (!stop) return;
+  if (!stop) {
+    return;
+  }
   const target =
     stop.dataset.stop === "group"
       ? (stop.querySelector<HTMLElement>('[aria-checked="true"]') ??
@@ -329,6 +367,7 @@ export function UserMenu({
   items = [],
   onSignOut,
   signOutKeys,
+  labels: labelOverrides,
   align = "end",
   showName = false,
   open: openProp,
@@ -338,6 +377,7 @@ export function UserMenu({
   ref,
   className,
 }: UserMenuProps) {
+  const text = { ...defaultLabels, ...labelOverrides };
   const id = useId();
   const menuId = `${id}-menu`;
   const triggerId = `${id}-trigger`;
@@ -376,7 +416,7 @@ export function UserMenu({
 
   useEffect(() => {
     mounted.current = true;
-    const current = typed.current;
+    const { current } = typed;
     return () => {
       mounted.current = false;
       window.clearTimeout(current.timer);
@@ -385,48 +425,68 @@ export function UserMenu({
 
   function setTriggerRef(node: HTMLButtonElement | null) {
     triggerRef.current = node;
-    if (typeof ref === "function") ref(node);
-    else if (ref) (ref as { current: HTMLButtonElement | null }).current = node;
+    if (typeof ref === "function") {
+      ref(node);
+    } else if (ref) {
+      (ref as { current: HTMLButtonElement | null }).current = node;
+    }
   }
 
   function setOpen(next: boolean, why: OpenReason = null) {
     reason.current = next ? why : null;
-    if (next) setSigningOut(pending.current);
+    if (next) {
+      setSigningOut(pending.current);
+    }
     setHighlight(null);
     setInnerOpen(next);
     onOpenChange?.(next);
   }
   function close(returnFocus: boolean) {
     setOpen(false);
-    if (returnFocus) triggerRef.current?.focus({ preventScroll: true });
+    if (returnFocus) {
+      triggerRef.current?.focus({ preventScroll: true });
+    }
   }
 
   // Focus moves in only when a person opened the menu, so a menu that starts open never steals focus or scrolls the page.
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      return;
+    }
     const why = reason.current;
     reason.current = null;
-    if (!why) return;
+    if (!why) {
+      return;
+    }
     const frame = requestAnimationFrame(() => {
       const stops = getStops(listRef.current);
-      if (why === "first") focusStop(stops[0]);
-      else if (why === "last") focusStop(stops.at(-1));
-      else surfaceRef.current?.focus({ preventScroll: true });
+      if (why === "first") {
+        focusStop(stops[0]);
+      } else if (why === "last") {
+        focusStop(stops.at(-1));
+      } else {
+        surfaceRef.current?.focus({ preventScroll: true });
+      }
     });
     return () => cancelAnimationFrame(frame);
   }, [open, sheet]);
 
   // The panel is placed against the trigger and scales from the avatar's center, flipping above when there is no room below.
   useLayoutEffect(() => {
-    if (!open || sheet) return;
+    if (!open || sheet) {
+      return;
+    }
     const place = () => {
-      const panel = surfaceRef.current,
-        trigger = triggerRef.current;
-      if (!panel || !trigger) return;
+      const panel = surfaceRef.current;
+      const trigger = triggerRef.current;
+      if (!panel || !trigger) {
+        return;
+      }
       const rect = trigger.getBoundingClientRect();
-      const width = panel.offsetWidth,
-        height = panel.offsetHeight;
-      let left: number, top: number;
+      const width = panel.offsetWidth;
+      const height = panel.offsetHeight;
+      let left: number;
+      let top: number;
       if (inline) {
         const root = rootRef.current?.getBoundingClientRect();
         left = (root?.left ?? 0) + panel.offsetLeft;
@@ -454,7 +514,9 @@ export function UserMenu({
       panel.style.setProperty("--origin-y", top < rect.top ? `${height}px` : "0px");
     };
     place();
-    if (inline) return;
+    if (inline) {
+      return;
+    }
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
@@ -465,10 +527,14 @@ export function UserMenu({
 
   // Outside presses close the panel. The sheet has its own scrim.
   useEffect(() => {
-    if (!open || sheet) return;
+    if (!open || sheet) {
+      return;
+    }
     const onPointerDown = (event: globalThis.PointerEvent) => {
       const target = event.target as Node;
-      if (surfaceRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      if (surfaceRef.current?.contains(target) || triggerRef.current?.contains(target)) {
+        return;
+      }
       reason.current = null;
       setHighlight(null);
       setInnerOpen(false);
@@ -480,7 +546,9 @@ export function UserMenu({
 
   // The page behind the sheet stays put.
   useEffect(() => {
-    if (!open || !sheet) return;
+    if (!open || !sheet) {
+      return;
+    }
     const root = document.documentElement;
     const previous = root.style.overflow;
     root.style.overflow = "hidden";
@@ -499,7 +567,9 @@ export function UserMenu({
   }
 
   function signOut() {
-    if (pending.current) return;
+    if (pending.current) {
+      return;
+    }
     const result = onSignOut?.();
     if (!result || typeof result.then !== "function") {
       close(true);
@@ -510,7 +580,9 @@ export function UserMenu({
     setSigningOut(true);
     const done = () => {
       pending.current = false;
-      if (mounted.current) close(false);
+      if (mounted.current) {
+        close(false);
+      }
     };
     result.then(done, done);
   }
@@ -523,33 +595,42 @@ export function UserMenu({
       return;
     }
     setHighlight((current) => ({
-      top: stop.offsetTop,
+      glide: current !== null && pointerMove.current,
       height: stop.offsetHeight,
       tone: stop.dataset.tone,
-      glide: current !== null && pointerMove.current,
+      top: stop.offsetTop,
     }));
   }
 
   // Focus follows a mouse or pen, so the keyboard carries on from wherever the pointer left the highlight.
   function onItemPointerMove(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "touch") return;
+    if (event.pointerType === "touch") {
+      return;
+    }
     pointerMove.current = true;
-    if (document.activeElement !== event.currentTarget)
+    if (document.activeElement !== event.currentTarget) {
       event.currentTarget.focus({ preventScroll: true });
+    }
   }
   // The inline switches are not rows, so the pointer over them releases the highlight instead of dragging it along.
   function onListPointerMove(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "touch" || !highlight) return;
+    if (event.pointerType === "touch" || !highlight) {
+      return;
+    }
     const group =
       event.target instanceof HTMLElement
         ? event.target.closest<HTMLElement>('[data-stop="group"]')
         : null;
-    if (!group || group.contains(document.activeElement)) return;
+    if (!group || group.contains(document.activeElement)) {
+      return;
+    }
     setHighlight(null);
     surfaceRef.current?.focus({ preventScroll: true });
   }
   function onListPointerLeave(event: PointerEvent<HTMLElement>) {
-    if (event.pointerType === "touch") return;
+    if (event.pointerType === "touch") {
+      return;
+    }
     setHighlight(null);
     surfaceRef.current?.focus({ preventScroll: true });
   }
@@ -565,25 +646,30 @@ export function UserMenu({
       focusStop(to);
     };
     switch (event.key) {
-      case "ArrowDown":
+      case "ArrowDown": {
         return step(stops[(index + 1) % stops.length]);
-      case "ArrowUp":
+      }
+      case "ArrowUp": {
         return step(stops[index <= 0 ? stops.length - 1 : index - 1]);
-      case "Home":
+      }
+      case "Home": {
         return step(stops[0]);
-      case "End":
+      }
+      case "End": {
         return step(stops.at(-1));
+      }
       case "Escape":
-      case "Tab":
+      case "Tab": {
         event.preventDefault();
         return close(true);
+      }
       case "ArrowLeft":
       case "ArrowRight": {
-        if (current?.dataset.stop !== "group") return;
+        if (current?.dataset.stop !== "group") {
+          return;
+        }
         event.preventDefault();
-        const segments = Array.from(
-          current.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
-        );
+        const segments = [...current.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
         const at = Math.max(
           0,
           segments.findIndex((segment) => segment.getAttribute("aria-checked") === "true"),
@@ -603,8 +689,9 @@ export function UserMenu({
       event.metaKey ||
       event.altKey ||
       event.key === " "
-    )
+    ) {
       return;
+    }
     // Typeahead: letters jump to the next row whose label starts with what was typed.
     const memory = typed.current;
     window.clearTimeout(memory.timer);
@@ -618,7 +705,9 @@ export function UserMenu({
         ? [current]
         : ordered;
     const match = search.find((stop) => stop.dataset.label?.toLowerCase().startsWith(memory.text));
-    if (match) step(match);
+    if (match) {
+      step(match);
+    }
   }
 
   function onTriggerClick(event: MouseEvent<HTMLButtonElement>) {
@@ -629,24 +718,28 @@ export function UserMenu({
     setOpen(true, event.detail === 0 ? "first" : "pointer");
   }
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+      return;
+    }
     event.preventDefault();
     setOpen(true, event.key === "ArrowDown" ? "first" : "last");
   }
 
   function onDragEnd(_: unknown, info: PanInfo) {
-    if (info.offset.y > 80 || info.velocity.y > 500) close(true);
+    if (info.offset.y > 80 || info.velocity.y > 500) {
+      close(true);
+    }
   }
 
   const glide: Transition =
     highlight?.glide && !reduced ? motionTokens.spring.snappy : { duration: 0 };
   const row = reduced ? undefined : rowMotion;
   const menuProps = {
-    id: menuId,
-    role: "menu",
     "aria-labelledby": triggerId,
-    tabIndex: -1,
+    id: menuId,
     onKeyDown,
+    role: "menu",
+    tabIndex: -1,
   };
 
   const content = (
@@ -676,7 +769,7 @@ export function UserMenu({
           aria-hidden="true"
           initial={false}
           animate={
-            highlight ? { y: highlight.top, height: highlight.height, opacity: 1 } : { opacity: 0 }
+            highlight ? { height: highlight.height, opacity: 1, y: highlight.top } : { opacity: 0 }
           }
           transition={{
             default: glide,
@@ -716,24 +809,25 @@ export function UserMenu({
             <div className={styles.separator} role="separator" />
             {showStatus && (
               <Segmented
-                label="Status"
+                label={text.status}
                 icon={<PresenceDot status={status} />}
                 value={status}
                 onChange={changeStatus}
                 options={userStatuses.map((option) => ({
                   ...option,
                   icon: <PresenceDot status={option.value} />,
+                  label: text[option.value],
                 }))}
                 variants={row}
               />
             )}
             {showTheme && (
               <Segmented
-                label="Theme"
+                label={text.theme}
                 icon={<SunMoon size={16} strokeWidth={1.75} />}
                 value={theme}
                 onChange={changeTheme}
-                options={themes}
+                options={themes.map((option) => ({ ...option, label: text[option.value] }))}
                 variants={row}
               />
             )}
@@ -747,7 +841,7 @@ export function UserMenu({
           className={styles.item}
           data-stop="item"
           data-tone="danger"
-          data-label="Sign out"
+          data-label={text.signOut}
           variants={row}
           aria-busy={signingOut || undefined}
           onPointerMove={onItemPointerMove}
@@ -761,7 +855,7 @@ export function UserMenu({
             )}
           </span>
           <span className={styles.itemLabel}>
-            <Rise text={signingOut ? "Signing out" : "Sign out"} reduced={reduced} />
+            <Rise text={signingOut ? text.signingOut : text.signOut} reduced={reduced} />
           </span>
           {signOutKeys && <Keys keys={signOutKeys} />}
         </motion.button>
@@ -819,8 +913,8 @@ export function UserMenu({
           animate="open"
           exit="exit"
           drag={reduced ? false : "y"}
-          dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={{ top: 0.04, bottom: 0.9 }}
+          dragConstraints={{ bottom: 0, top: 0 }}
+          dragElastic={{ bottom: 0.9, top: 0.04 }}
           dragMomentum={false}
           onDragEnd={onDragEnd}
         >
@@ -843,7 +937,7 @@ export function UserMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={`Account menu, ${user.name}${showStatus ? `, ${statusLabel(status)}` : ""}`}
+        aria-label={`${text.account}, ${user.name}${showStatus ? `, ${text[status]}` : ""}`}
         onClick={onTriggerClick}
         onKeyDown={onTriggerKeyDown}
       >

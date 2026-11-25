@@ -3,6 +3,7 @@ import { useId, useState } from "react";
 
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
+import { useI18n } from "@/i18n/i18n";
 import { orpc } from "@/utils/orpc";
 
 import styles from "./lists.module.css";
@@ -13,7 +14,8 @@ interface ListNameFormProps {
 }
 
 /** Creating a list is a single field, so the Lists tab and the title dialog share this form. */
-export const ListNameForm = ({ onCreated, submitLabel = "Create list" }: ListNameFormProps) => {
+export const ListNameForm = ({ onCreated, submitLabel }: ListNameFormProps) => {
+  const { t } = useI18n();
   const errorId = useId();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
@@ -36,7 +38,7 @@ export const ListNameForm = ({ onCreated, submitLabel = "Create list" }: ListNam
       setName("");
       await onCreated?.(list);
     } catch {
-      setError("We could not create the list. Check your connection and try again.");
+      setError(t("lists.createError"));
     }
   };
 
@@ -51,14 +53,14 @@ export const ListNameForm = ({ onCreated, submitLabel = "Create list" }: ListNam
     >
       <Input
         autoComplete="off"
-        label="Name"
+        label={t("lists.nameLabel")}
         maxLength={100}
-        placeholder="Films to rewatch"
+        placeholder={t("lists.namePlaceholder")}
         value={name}
         onChange={(event) => setName(event.target.value)}
       />
       <Button disabled={!canCreate} loading={create.isPending} type="submit">
-        {submitLabel}
+        {submitLabel ?? t("lists.create")}
       </Button>
       {error === null ? null : (
         <p className={styles.formError} id={errorId} role="alert">

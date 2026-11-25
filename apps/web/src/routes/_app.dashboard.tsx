@@ -1,12 +1,17 @@
 import { PageIntro } from "@/components/page-intro";
+import { useI18n } from "@/i18n/i18n";
+import { pageTitle } from "@/i18n/meta";
 
-export const meta = () => [{ title: "Dashboard · reelory" }];
+import type { Route } from "./+types/_app.dashboard";
 
-const Dashboard = () => (
-  <PageIntro
-    title="Dashboard"
-    description="A private summary of your account and viewing history."
-  />
-);
+export const meta: Route.MetaFunction = ({ matches }: Route.MetaArgs) => [
+  { title: pageTitle(matches, "dashboard.title") },
+];
+
+const Dashboard = () => {
+  const { t } = useI18n();
+
+  return <PageIntro description={t("dashboard.description")} title={t("dashboard.title")} />;
+};
 
 export default Dashboard;

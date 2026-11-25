@@ -10,6 +10,7 @@ import { Button } from "@/components/arc/button/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { useI18n } from "@/i18n/i18n";
 import { tmdbImageUrl, yearFromDate } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
@@ -42,6 +43,7 @@ const titleMatches = (results: TmdbMediaSummary[]) => {
 };
 
 export const AddTitleDialog = () => {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [settled, setSettled] = useState("");
@@ -69,25 +71,25 @@ export const AddTitleDialog = () => {
   if (!normalized) {
     body = null;
   } else if (!ready || search.isPending) {
-    status = "Searching TMDB";
-    body = <Skeleton aria-hidden="true" label="Searching TMDB" lines={3} />;
+    status = t("add.searching");
+    body = <Skeleton aria-hidden="true" label={t("add.searching")} lines={3} />;
   } else if (search.isError) {
     body = (
-      <Alert title="Could not search TMDB" tone="danger">
-        <p>Check your connection and try again.</p>
+      <Alert title={t("add.errorTitle")} tone="danger">
+        <p>{t("add.errorHelp")}</p>
         <Button type="button" variant="secondary" onClick={() => search.refetch()}>
-          Retry search
+          {t("add.retry")}
         </Button>
       </Alert>
     );
   } else {
     const matches = titleMatches(search.data.results);
-    status = matches.length === 1 ? "1 title found" : `${matches.length} titles found`;
+    status = t("count.titlesFound", { count: matches.length });
     body =
       matches.length === 0 ? (
-        <p className={styles.searchMeta}>No titles found. Try another title or actor’s name.</p>
+        <p className={styles.searchMeta}>{t("add.noResults")}</p>
       ) : (
-        <ul aria-label="Matching titles" className={styles.searchResults}>
+        <ul aria-label={t("add.resultsLabel")} className={styles.searchResults}>
           {matches.map(([key, { title, actor }]) => {
             const movie = title.mediaType === "movie";
             const year = yearFromDate(movie ? title.releaseDate : title.firstAirDate);
@@ -102,7 +104,11 @@ export const AddTitleDialog = () => {
                   <span className={styles.searchCopy}>
                     <span className={styles.cardTitle}>{movie ? title.title : title.name}</span>
                     <span className={styles.searchMeta}>
-                      {[movie ? "Film" : "Series", year, actor && `Known for: ${actor}`]
+                      {[
+                        movie ? t("common.film") : t("common.series"),
+                        year,
+                        actor && t("add.knownFor", { name: actor }),
+                      ]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
@@ -130,12 +136,13 @@ export const AddTitleDialog = () => {
       <DialogTrigger asChild>
         <Button size="lg" type="button">
           <Plus aria-hidden="true" />
-          Add
+          {t("add.button")}
         </Button>
       </DialogTrigger>
       <DialogContent
-        description="Open a film or series to see its details."
-        title="Add a title"
+        closeLabel={t("arc.dialog.close")}
+        description={t("add.description")}
+        title={t("add.title")}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           field.current?.focus();
@@ -145,9 +152,10 @@ export const AddTitleDialog = () => {
           <SearchField
             ref={field}
             autoComplete="off"
-            label="Title or actor’s name"
+            clearLabel={t("arc.search.clear")}
+            label={t("add.fieldLabel")}
             maxLength={200}
-            placeholder="Dune, Breaking Bad, Zendaya"
+            placeholder={t("add.placeholder")}
             value={query}
             onCompositionEnd={() => setComposing(false)}
             onCompositionStart={() => setComposing(true)}

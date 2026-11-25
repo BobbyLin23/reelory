@@ -41,6 +41,12 @@ export interface RatingProps {
   emptyLabel?: string;
   /** Submits the value with a surrounding form. */
   name?: string;
+  /** Localized text for a value, such as "4.5 out of 5". */
+  formatValue?: (value: number, max: number) => string;
+  /** Localized spoken text for a value, such as "4.5 of 5 stars". */
+  formatSpokenValue?: (value: number, max: number) => string;
+  /** Announced when the rating is cleared. */
+  clearedLabel?: string;
 }
 
 const defaultWords = ["Poor", "Fair", "Good", "Great", "Excellent"] as const;
@@ -67,15 +73,15 @@ const wordMotion: Variants = {
     y: 0,
   },
   enter: (direction: number) => ({
+    filter: `blur(${motionTokens.blur.soft}px)`,
     opacity: 0,
     y: `${direction * 0.3}em`,
-    filter: `blur(${motionTokens.blur.soft}px)`,
   }),
   exit: (direction: number) => ({
-    opacity: 0,
-    y: `${direction * -0.25}em`,
     filter: `blur(${motionTokens.blur.subtle}px)`,
+    opacity: 0,
     transition: { duration: motionTokens.duration.instant, ease: [...motionTokens.ease.standard] },
+    y: `${direction * -0.25}em`,
   }),
 };
 
@@ -156,7 +162,7 @@ function StarGlyph({ fill, kept, delay, soft, pressed, pop, reduced }: GlyphProp
     }
     targets.current.pop = popKey;
     if (!reduced) {
-      animate(scale, 1, { ...popSpring, velocity: popVelocity, delay: popDelay });
+      animate(scale, 1, { ...popSpring, delay: popDelay, velocity: popVelocity });
     }
   }, [popKey, popDelay, reduced, scale]);
   return (
@@ -206,6 +212,9 @@ export function Rating({
   valueLabels,
   emptyLabel = "Not rated",
   name,
+  formatValue = (next, max) => `${next} out of ${max}`,
+  formatSpokenValue = (next, max) => `${next} of ${max} stars`,
+  clearedLabel = "Rating cleared",
 }: RatingProps) {
   const generatedId = useId();
   const labelId = `${generatedId}-label`;
@@ -239,9 +248,9 @@ export function Rating({
   const words = valueLabels ?? (max === 5 && !allowHalf ? defaultWords : undefined);
   const wordFor = (next: number) => (Number.isInteger(next) ? words?.[next - 1] : undefined);
   const textFor = (next: number) =>
-    next <= 0 ? emptyLabel : (wordFor(next) ?? `${next} out of ${max}`);
+    next <= 0 ? emptyLabel : (wordFor(next) ?? formatValue(next, max));
   const spokenFor = (next: number) =>
-    [wordFor(next), `${next} of ${max} stars`].filter(Boolean).join(", ");
+    [wordFor(next), formatSpokenValue(next, max)].filter(Boolean).join(", ");
   const steps = Array.from({ length: Math.round(max / step) }, (_, index) => (index + 1) * step);
 
   /** `time` is the event's timeStamp, which shares performance.now()'s clock. */
@@ -263,7 +272,7 @@ export function Rating({
     setPulse({ key: time, value: chosen, wave: time - lastCommit.current > waveGap });
     lastCommit.current = time;
     if (announce) {
-      setAnnouncement(chosen === 0 ? "Rating cleared" : spokenFor(chosen));
+      setAnnouncement(chosen === 0 ? clearedLabel : spokenFor(chosen));
     }
     if (chosen === currentValue) {
       return;
@@ -439,11 +448,7 @@ export function Rating({
           className={styles.stars}
           role={readOnly ? "img" : "radiogroup"}
           aria-labelledby={readOnly ? undefined : labelId}
-          aria-label={
-            readOnly
-              ? `${label}: ${currentValue > 0 ? `${currentValue} out of ${max}` : emptyLabel}`
-              : undefined
-          }
+          aria-label={readOnly ? `${label}: ${textFor(currentValue)}` : undefined}
           aria-describedby={description && !readOnly ? descriptionId : undefined}
           aria-disabled={disabled || undefined}
           data-rated={displayValue > 0 || undefined}

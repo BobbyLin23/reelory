@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
+
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
 import { BrandLockup } from "@/components/brand-lockup";
 import { useTheme } from "@/components/theme-provider";
-import styles from "@/components/auth-page.module.css";
+import { useI18n } from "@/i18n/i18n";
 
-import type { ReactNode } from "react";
+import styles from "@/components/auth-page.module.css";
 
 interface AuthPageProps {
   title: string;
@@ -14,6 +16,7 @@ interface AuthPageProps {
 /** The frame both auth screens share: brand bar and a calm, borderless form column. */
 export const AuthPage = ({ title, description, children }: AuthPageProps) => {
   const { resolvedTheme, setTheme } = useTheme();
+  const { t } = useI18n();
 
   return (
     <main className={styles.page}>
@@ -21,6 +24,7 @@ export const AuthPage = ({ title, description, children }: AuthPageProps) => {
         <BrandLockup />
         <ThemeSwitch
           iconOnly
+          label={resolvedTheme === "light" ? t("theme.switchToDark") : t("theme.switchToLight")}
           theme={resolvedTheme === "light" ? "light" : "dark"}
           onThemeChange={setTheme}
         />

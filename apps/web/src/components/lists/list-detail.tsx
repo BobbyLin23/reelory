@@ -14,6 +14,9 @@ import { InlineEdit } from "@/components/arc/inline-edit/inline-edit";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { errorCode } from "@/components/title-page/use-title-page";
+import { useI18n } from "@/i18n/i18n";
+import type { Locale } from "@/i18n/locale";
+import { translate } from "@/i18n/messages";
 import type { MediaType } from "@/utils/media";
 import { tmdbImageUrl, yearFromDate } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
@@ -26,7 +29,8 @@ import styles from "./lists.module.css";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-const KIND_LABEL: Record<MediaType, string> = { movie: "Film", tv: "Series" };
+const kindLabel = (mediaType: MediaType, locale: Locale) =>
+  translate(locale, mediaType === "movie" ? "common.film" : "common.series");
 
 interface TitleRef {
   mediaType: MediaType;
@@ -37,21 +41,21 @@ type TitleSummary = Extract<TmdbMediaSummary, { mediaType: "movie" | "tv" }>;
 
 const isTitle = (result: TmdbMediaSummary): result is TitleSummary => result.mediaType !== "person";
 
-const titleName = (title: ListTitle | null | undefined) => {
+const titleName = (title: ListTitle | null | undefined, locale: Locale) => {
   if (title === undefined) {
-    return "Loading title";
+    return translate(locale, "lists.loadingTitle");
   }
-  return title?.title ?? "Title unavailable";
+  return title?.title ?? translate(locale, "lists.titleUnavailable");
 };
 
-const titleMeta = (title: ListTitle | null | undefined, mediaType: MediaType) => {
+const titleMeta = (title: ListTitle | null | undefined, mediaType: MediaType, locale: Locale) => {
   if (title === undefined) {
-    return "Loading";
+    return translate(locale, "lists.loadingShort");
   }
   if (title === null) {
-    return "Not available from TMDB";
+    return translate(locale, "lists.notInTmdb");
   }
-  return `${title.year ?? "No year"} · ${KIND_LABEL[mediaType]}`;
+  return `${title.year ?? translate(locale, "common.noYear")} · ${kindLabel(mediaType, locale)}`;
 };
 
 const TitleCard = ({
@@ -67,6 +71,7 @@ const TitleCard = ({
   title: ListTitle | null | undefined;
   titleRef: TitleRef;
 }) => {
+  const { locale, t } = useI18n();
   const poster = tmdbImageUrl(title?.posterPath ?? null, "w500");
   return (
     <li className={styles.titleCard}>
@@ -75,12 +80,15 @@ const TitleCard = ({
           {poster === null ? null : <img alt="" src={poster} />}
         </span>
         <span className={styles.titleCopy}>
-          <span className={styles.cardTitle}>{titleName(title)}</span>
-          <span className={styles.meta}>{titleMeta(title, titleRef.mediaType)}</span>
+          <span className={styles.cardTitle}>{titleName(title, locale)}</span>
+          <span className={styles.meta}>{titleMeta(title, titleRef.mediaType, locale)}</span>
         </span>
       </Link>
       <Button
-        aria-label={`Remove ${title?.title ?? "this title"} from ${listName}`}
+        aria-label={t("lists.removeFrom", {
+          list: listName,
+          title: title?.title ?? t("lists.titles"),
+        })}
         className={styles.removeButton}
         loading={removing}
         size="sm"
@@ -89,7 +97,7 @@ const TitleCard = ({
         onClick={onRemove}
       >
         <X aria-hidden="true" size={14} strokeWidth={2} />
-        Remove
+        {t("common.remove")}
       </Button>
     </li>
   );
@@ -106,35 +114,36 @@ const SearchResults = ({
   onAdd: (ref: TitleRef) => void;
   query: string;
 }) => {
+  const { locale, t } = useI18n();
   const search = useQuery(orpc.tmdb.search.queryOptions({ input: { query } }));
   const results = (search.data?.results ?? []).filter(isTitle);
   const total = search.data?.totalResults ?? 0;
   const count =
     (search.data?.totalPages ?? 0) > 1
-      ? `Showing ${results.length} of ${total}`
-      : `${total} ${total === 1 ? "match" : "matches"}`;
+      ? t("discover.showing", { shown: results.length, total })
+      : t("count.matches", { count: total });
 
   if (search.isError) {
     return (
-      <Alert title="Search is unavailable" tone="danger">
-        <p>We could not reach TMDB. Check your connection and try again.</p>
+      <Alert title={t("discover.searchErrorTitle")} tone="danger">
+        <p>{t("discover.searchErrorHelp")}</p>
         <Button type="button" variant="secondary" onClick={() => search.refetch()}>
-          Try again
+          {t("common.tryAgain")}
         </Button>
       </Alert>
     );
   }
 
   if (search.isPending) {
-    return <Skeleton label="Loading search results" lines={5} />;
+    return <Skeleton label={t("discover.loadingSearch")} lines={5} />;
   }
 
   if (results.length === 0) {
     return (
       <EmptyState
-        description="Check the spelling, or try the title in another language."
+        description={t("discover.noResultsDescription")}
         icon={<SearchX aria-hidden="true" size={20} />}
-        title="No results for that search"
+        title={t("discover.noResultsTitle")}
       />
     );
   }
@@ -142,7 +151,7 @@ const SearchResults = ({
   return (
     <section aria-labelledby="list-search-heading" className={styles.searchResults}>
       <h3 className={styles.resultsHeading} id="list-search-heading">
-        Results for “{query}”
+        {t("discover.resultsFor", { query })}
       </h3>
       <p className={styles.note}>{count}</p>
       <ul className={styles.results}>
@@ -165,12 +174,12 @@ const SearchResults = ({
               <span className={styles.resultCopy}>
                 <span className={styles.cardTitle}>{title}</span>
                 <span className={styles.meta}>
-                  {year ?? "No year"} · {KIND_LABEL[titleRef.mediaType]}
+                  {year ?? t("common.noYear")} · {kindLabel(titleRef.mediaType, locale)}
                 </span>
               </span>
               {inList.has(key) ? (
                 <Badge pill size="sm">
-                  In this list
+                  {t("lists.inList")}
                 </Badge>
               ) : (
                 <Button
@@ -180,7 +189,7 @@ const SearchResults = ({
                   variant="secondary"
                   onClick={() => onAdd(titleRef)}
                 >
-                  Add
+                  {t("common.add")}
                 </Button>
               )}
             </li>
@@ -231,13 +240,14 @@ const TitleSearch = ({
     debounce.current = setTimeout(() => setSettledQuery(trimmed), SEARCH_DEBOUNCE_MS);
   };
 
+  const { t } = useI18n();
   const searchActive = query.trim() !== "";
   const waiting = settledQuery !== query.trim();
 
   let content: ReactNode = null;
   if (searchActive) {
     content = waiting ? (
-      <Skeleton label="Searching TMDB" lines={5} />
+      <Skeleton label={t("discover.searching")} lines={5} />
     ) : (
       <SearchResults addingKey={addingKey} inList={inList} query={settledQuery} onAdd={onAdd} />
     );
@@ -246,14 +256,15 @@ const TitleSearch = ({
   return (
     <section aria-labelledby="add-titles-heading" className={styles.section}>
       <h2 className={styles.sectionHeading} id="add-titles-heading">
-        Add titles
+        {t("lists.addTitles")}
       </h2>
-      <p className={styles.note}>Search TMDB. A title is added to the end of this list.</p>
+      <p className={styles.note}>{t("lists.addTitlesDescription")}</p>
       <SearchField
         autoComplete="off"
-        label="Search films and series"
+        clearLabel={t("arc.search.clear")}
+        label={t("lists.searchLabel")}
         maxLength={200}
-        placeholder="Dune, Breaking Bad"
+        placeholder={t("lists.searchPlaceholder")}
         value={query}
         onValueChange={changeQuery}
       />
@@ -263,6 +274,7 @@ const TitleSearch = ({
 };
 
 export const ListDetail = ({ listId }: { listId: string }) => {
+  const { locale, t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
@@ -288,26 +300,26 @@ export const ListDetail = ({ listId }: { listId: string }) => {
         <EmptyState
           action={
             <Link className={styles.backLink} to="/lists">
-              Back to lists
+              {t("lists.backToLists")}
             </Link>
           }
-          description="It may have been deleted, or the link is wrong."
+          description={t("lists.notFoundDescription")}
           icon={<ListVideo aria-hidden="true" size={20} />}
-          title="List not found"
+          title={t("lists.notFoundTitle")}
         />
       );
     }
     return (
-      <Alert title="Could not load this list" tone="danger">
+      <Alert title={t("lists.detailLoadError")} tone="danger">
         <Button type="button" variant="secondary" onClick={() => listQuery.refetch()}>
-          Try again
+          {t("common.tryAgain")}
         </Button>
       </Alert>
     );
   }
 
   if (listQuery.data === undefined) {
-    return <Skeleton label="Loading this list" lines={6} />;
+    return <Skeleton label={t("lists.detailLoading")} lines={6} />;
   }
 
   const list = listQuery.data;
@@ -327,7 +339,7 @@ export const ListDetail = ({ listId }: { listId: string }) => {
       await addItem.mutateAsync({ listId, ...titleRef });
       await refresh();
     } catch {
-      setActionError("We could not add that title. Check your connection and try again.");
+      setActionError(t("lists.addError"));
     }
   };
 
@@ -337,7 +349,7 @@ export const ListDetail = ({ listId }: { listId: string }) => {
       await removeItem.mutateAsync({ listId, ...titleRef });
       await refresh();
     } catch {
-      setActionError("We could not remove that title. Check your connection and try again.");
+      setActionError(t("lists.removeError"));
     }
   };
 
@@ -355,43 +367,60 @@ export const ListDetail = ({ listId }: { listId: string }) => {
     <div className={styles.page}>
       <Link className={styles.backLink} to="/lists">
         <ArrowLeft aria-hidden="true" size={16} strokeWidth={1.75} />
-        All lists
+        {t("lists.back")}
       </Link>
       <header className={styles.detailHeader}>
         <div className={styles.detailHeading}>
           <InlineEdit
             as="h1"
-            label="List name"
+            label={t("lists.nameFieldLabel")}
+            labels={{
+              activate: t("arc.inline.activate"),
+              cancel: t("arc.inline.cancel"),
+              editHint: t("arc.inline.editHint"),
+              failed: t("arc.inline.failed"),
+              multilineEditHint: t("arc.inline.multilineEditHint"),
+              retry: t("arc.inline.retry"),
+              save: t("arc.inline.save"),
+              saved: t("arc.inline.saved"),
+              saving: t("arc.inline.saving"),
+              valueLabel: t("arc.inline.valueLabel"),
+            }}
             validate={(next) => {
               const trimmed = next.trim();
               if (trimmed === "") {
-                return "Give the list a name.";
+                return t("lists.nameRequired");
               }
-              return trimmed.length > 100 ? "Keep the name under 100 characters." : null;
+              return trimmed.length > 100 ? t("lists.nameTooLong") : null;
             }}
             value={list.name}
             variant="title"
             onSave={rename}
           />
-          <p className={styles.meta}>{countLabel(items.length)}</p>
+          <p className={styles.meta}>{countLabel(items.length, locale)}</p>
         </div>
         <ConfirmMorph
+          cancelLabel={t("common.cancel")}
+          confirmLabel={t("common.delete")}
+          doneLabel={t("common.deleted")}
+          errorLabel={t("common.errorLabel")}
           icon={<Trash2 aria-hidden="true" size={16} strokeWidth={1.75} />}
-          label="Delete list"
-          pendingLabel="Deleting"
-          prompt={`Delete “${list.name}”?`}
+          label={t("lists.deleteLabel")}
+          pendingLabel={t("common.deleting")}
+          prompt={t("lists.deletePrompt", { name: list.name })}
+          retryLabel={t("common.tryAgain")}
           onConfirm={confirmDelete}
         />
       </header>
       <section aria-labelledby="list-titles-heading" className={styles.section}>
         <h2 className={styles.sectionHeading} id="list-titles-heading">
-          Titles
+          {t("lists.titles")}
         </h2>
         {items.length === 0 ? (
           <EmptyState
-            description="Search below, or open a title and add it to this list."
+            description={t("lists.emptyListDescription")}
             icon={<ListVideo aria-hidden="true" size={20} />}
-            title="This list is empty"
+            title={t("lists.emptyListTitle")}
           />
         ) : (
           <ul className={styles.titleGrid}>

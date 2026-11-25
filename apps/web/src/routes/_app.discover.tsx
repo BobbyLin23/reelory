@@ -1,6 +1,11 @@
 import { Discover } from "@/components/discover/discover";
+import { pageTitle } from "@/i18n/meta";
 
-export const meta = () => [{ title: "Discover · reelory" }];
+import type { Route } from "./+types/_app.discover";
+
+export const meta: Route.MetaFunction = ({ matches }: Route.MetaArgs) => [
+  { title: pageTitle(matches, "nav.discover") },
+];
 
 const DiscoverRoute = () => <Discover />;
 

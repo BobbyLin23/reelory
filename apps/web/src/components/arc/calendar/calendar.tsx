@@ -33,6 +33,8 @@ export interface CalendarProps {
   className?: string;
   /** Adds a Today button that slides back to the current month and selects today when it is available. */
   showToday?: boolean;
+  /** Localized copy for the month navigation. */
+  labels?: Partial<{ today: string; todayFull: string; previousMonth: string; nextMonth: string }>;
 }
 
 const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -93,8 +95,8 @@ const titleSlide: Variants = {
   enter: (direction: number) => ({ opacity: 0, x: direction * 12 }),
   exit: (direction: number) => ({
     opacity: 0,
-    x: direction * -12,
     transition: { duration: motionTokens.duration.fast, ease: ease.standard },
+    x: direction * -12,
   }),
 };
 /** Reduced motion swaps the title in place, with no travel and no blank frame. */
@@ -198,7 +200,15 @@ export function Calendar({
   locale = "en-US",
   className,
   showToday = false,
+  labels: labelOverrides,
 }: CalendarProps) {
+  const labels = {
+    nextMonth: "Next month",
+    previousMonth: "Previous month",
+    today: "Today",
+    todayFull: "Today, {date}",
+    ...labelOverrides,
+  };
   const titleId = useId();
   const today = useToday();
   // Motion preference only counts after hydration, so server and client markup agree.
@@ -507,18 +517,21 @@ export function Calendar({
               aria-disabled={todayIdle || undefined}
               aria-label={
                 today
-                  ? `Today, ${today.toLocaleDateString(locale, { dateStyle: "full" })}`
-                  : "Today"
+                  ? labels.todayFull.replaceAll(
+                      "{date}",
+                      today.toLocaleDateString(locale, { dateStyle: "full" }),
+                    )
+                  : labels.today
               }
               onClick={goToToday}
             >
-              Today
+              {labels.today}
             </button>
           )}
           <button
             type="button"
             className={styles.navButton}
-            aria-label="Previous month"
+            aria-label={labels.previousMonth}
             aria-disabled={previousDisabled || undefined}
             onClick={() => {
               if (!previousDisabled && previousMonth) {
@@ -531,7 +544,7 @@ export function Calendar({
           <button
             type="button"
             className={styles.navButton}
-            aria-label="Next month"
+            aria-label={labels.nextMonth}
             aria-disabled={nextDisabled || undefined}
             onClick={() => {
               if (!nextDisabled && nextMonth) {

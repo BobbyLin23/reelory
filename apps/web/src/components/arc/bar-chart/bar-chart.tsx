@@ -1,17 +1,6 @@
 "use client";
 
 import {
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type KeyboardEvent,
-  type PointerEvent,
-} from "react";
-import {
   AnimatePresence,
   animate,
   cancelFrame,
@@ -22,10 +11,21 @@ import {
   usePresence,
   useReducedMotion,
   useTransform,
-  type MotionValue,
-  type Variants,
 } from "motion/react";
+import type { MotionValue, Variants } from "motion/react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import type { KeyboardEvent, PointerEvent } from "react";
+
 import { motionTokens } from "../lib/motion-tokens";
+
 import styles from "./bar-chart.module.css";
 
 export interface BarChartDatum {
@@ -58,6 +58,8 @@ export interface BarChartProps {
   /** Plot height in pixels. */
   height?: number;
   formatValue?: (value: number) => string;
+  /** Localized copy for the chart's empty state and screen-reader summary. */
+  labels?: Partial<{ noData: string; highest: string; lowest: string; explore: string }>;
 }
 
 const { spring, duration, ease, blur, stagger } = motionTokens;
@@ -68,11 +70,11 @@ const physical = (
 ) => {
   const root = (2 * Math.PI) / (visualDuration * 1.2);
   return {
-    type: "spring" as const,
-    stiffness: root * root,
     damping: 2 * (1 - bounce) * root,
     restDelta,
     restSpeed: restDelta * 2,
+    stiffness: root * root,
+    type: "spring" as const,
   };
 };
 const settle = physical(spring.smooth);
@@ -80,7 +82,7 @@ const grow = physical(spring.morph);
 const glide = physical(spring.snappy);
 /** The zoom runs in fractions of the plot, so it rests far below a pixel. */
 const zoom = physical(spring.smooth, 0.00001);
-const collapse = physical({ visualDuration: duration.standard, bounce: 0 });
+const collapse = physical({ bounce: 0, visualDuration: duration.standard });
 const fadeFast = { duration: duration.instant, ease: [...ease.standard] } as const;
 /** Starts animations on the next frame, so the render that caused them never swallows a spring's first frames. Returns a cleanup. */
 function soon(start: () => { stop: () => void }) {
@@ -96,10 +98,10 @@ function soon(start: () => { stop: () => void }) {
 }
 
 /** Room above the top gridline, the share of each slot a bar fills, its widest size, and the radius of its data end. */
-const TOP = 12,
-  FILL = 0.58,
+const FILL = 0.58,
   MAX_BAR = 28,
-  RADIUS = 4;
+  RADIUS = 4,
+  TOP = 12;
 const grouped = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
@@ -108,20 +110,23 @@ function scaleFor(max: number) {
   const safe = Math.max(max, 1);
   const magnitude = 10 ** Math.floor(Math.log10(safe / 4));
   for (const factor of [1, 2, 3, 5, 10]) {
-    const step = factor * magnitude,
-      rows = Math.ceil(safe / step);
-    if (rows <= 4)
+    const step = factor * magnitude;
+    const rows = Math.ceil(safe / step);
+    if (rows <= 4) {
       return { top: rows * step, ticks: Array.from({ length: rows + 1 }, (_, row) => row * step) };
+    }
   }
-  return { top: safe, ticks: [0, safe] };
+  return { ticks: [0, safe], top: safe };
 }
 
 /** A column that grows from a square baseline to a softly rounded data end. */
 function barPath(x: number, w: number, h: number, base: number) {
-  if (w <= 0 || h <= 0.01) return `M${x.toFixed(2)} ${base}H${(x + Math.max(w, 0)).toFixed(2)}Z`;
-  const r = Math.min(RADIUS, w / 2, h),
-    top = base - h,
-    f = (value: number) => value.toFixed(2);
+  if (w <= 0 || h <= 0.01) {
+    return `M${x.toFixed(2)} ${base}H${(x + Math.max(w, 0)).toFixed(2)}Z`;
+  }
+  const r = Math.min(RADIUS, w / 2, h);
+  const top = base - h;
+  const f = (value: number) => value.toFixed(2);
   return `M${f(x)} ${base}V${f(top + r)}A${f(r)} ${f(r)} 0 0 1 ${f(x + r)} ${f(top)}H${f(x + w - r)}A${f(r)} ${f(r)} 0 0 1 ${f(x + w)} ${f(top + r)}V${base}Z`;
 }
 
@@ -129,7 +134,9 @@ function barPath(x: number, w: number, h: number, base: number) {
 function usePlace(place: number, reduced: boolean) {
   const value = useMotionValue(place);
   useEffect(() => {
-    if (value.get() === place) return;
+    if (value.get() === place) {
+      return;
+    }
     if (reduced) {
       value.jump(place);
       return;
@@ -139,7 +146,10 @@ function usePlace(place: number, reduced: boolean) {
   return value;
 }
 
-type Frame = { width: MotionValue<number>; unit: MotionValue<number> };
+interface Frame {
+  width: MotionValue<number>;
+  unit: MotionValue<number>;
+}
 const centerOf = ({ width, unit }: Frame, place: number) =>
   width.get() - (place + 0.5) * width.get() * unit.get();
 
@@ -178,13 +188,17 @@ function Bar({
 
   // A bar grows once it is seen, each a beat after its neighbour; later values settle without a delay.
   useEffect(() => {
-    if (!isPresent) return;
+    if (!isPresent) {
+      return;
+    }
     if (reduced) {
       amount.jump(value);
       grown.current = true;
       return;
     }
-    if (!shown) return;
+    if (!shown) {
+      return;
+    }
     const first = !grown.current;
     grown.current = true;
     return soon(() => animate(amount, value, first ? { ...grow, delay: firstDelay } : settle));
@@ -192,7 +206,9 @@ function Bar({
 
   // A leaving bar sinks into the baseline, faster than a bar grows, while the zoom carries it out of the plot.
   useEffect(() => {
-    if (isPresent) return;
+    if (isPresent) {
+      return;
+    }
     if (reduced) {
       remove.current?.();
       return;
@@ -201,9 +217,9 @@ function Bar({
   }, [amount, isPresent, reduced]);
 
   const d = useTransform(() => {
-    const w = frame.width.get() * frame.unit.get(),
-      size = Math.min(w * FILL, MAX_BAR),
-      center = centerOf(frame, slot.get());
+    const w = frame.width.get() * frame.unit.get();
+    const size = Math.min(w * FILL, MAX_BAR);
+    const center = centerOf(frame, slot.get());
     return barPath(center - size / 2, size, (amount.get() / scale.get()) * (height - TOP), height);
   });
   return (
@@ -226,7 +242,9 @@ function Gridline({
   height: number;
 }) {
   const y = useRowY(value, scale, height);
-  if (value === 0) return null;
+  if (value === 0) {
+    return null;
+  }
   return (
     <motion.line
       className={styles.grid}
@@ -311,14 +329,18 @@ function AxisLabel({
 /** Axis labels that fit once the range has settled: every label, else every second, third, and so on, counted back from the latest so the newest date always shows and spacing stays even. */
 function fittingLabels(data: BarChartDatum[], width: number, sizes: Record<string, number>) {
   const fitting = new Map<string, number>();
-  if (!width) return fitting;
+  if (!width) {
+    return fitting;
+  }
   const count = Math.max(1, data.length);
   const labels = data
     .flatMap((item, index) => {
       const size = item.axisLabel ? sizes[item.axisLabel] : undefined;
-      if (size === undefined) return [];
+      if (size === undefined) {
+        return [];
+      }
       const natural = width - (data.length - 1 - index + 0.5) * (width / count) - size / 2;
-      return [{ key: item.key, size, natural, left: clamp(natural, 0, Math.max(0, width - size)) }];
+      return [{ key: item.key, left: clamp(natural, 0, Math.max(0, width - size)), natural, size }];
     })
     .reverse();
   for (let stride = 1; stride <= labels.length; stride++) {
@@ -338,28 +360,28 @@ function fittingLabels(data: BarChartDatum[], width: number, sizes: Record<strin
 
 /** Changed text rises from a soft blur in the direction it moved, and leaves a little faster than it arrives. */
 const rise: Variants = {
-  hidden: (direction: number) => ({
-    opacity: 0,
-    y: `${0.3 * direction}em`,
-    filter: `blur(${blur.soft}px)`,
-  }),
-  shown: {
-    opacity: 1,
-    y: 0,
-    filter: "blur(0px)",
-    transition: { duration: duration.standard, ease: [...ease.enter] },
-  },
   gone: (direction: number) => ({
     opacity: 0,
     y: `${-0.3 * direction}em`,
     filter: `blur(${blur.subtle}px)`,
     transition: { duration: duration.instant, ease: [...ease.standard] },
   }),
+  hidden: (direction: number) => ({
+    opacity: 0,
+    y: `${0.3 * direction}em`,
+    filter: `blur(${blur.soft}px)`,
+  }),
+  shown: {
+    filter: "blur(0px)",
+    opacity: 1,
+    transition: { duration: duration.standard, ease: [...ease.enter] },
+    y: 0,
+  },
 };
 const fade: Variants = {
-  hidden: { opacity: 0, y: 0, filter: "blur(0px)" },
-  shown: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: duration.fast } },
-  gone: { opacity: 0, y: 0, filter: "blur(0px)", transition: { duration: duration.instant } },
+  gone: { filter: "blur(0px)", opacity: 0, transition: { duration: duration.instant }, y: 0 },
+  hidden: { filter: "blur(0px)", opacity: 0, y: 0 },
+  shown: { filter: "blur(0px)", opacity: 1, transition: { duration: duration.fast }, y: 0 },
 };
 
 function Swap({ text, direction, reduced }: { text: string; direction: number; reduced: boolean }) {
@@ -388,14 +410,18 @@ function Roll({ text, direction, reduced }: { text: string; direction: number; r
   const width = useMotionValue<number | "auto">("auto");
   useLayoutEffect(() => {
     const node = sizer.current;
-    if (!node || typeof ResizeObserver === "undefined") return;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
     let measured: string | null = null;
     // Only a new value springs; a late web font or a resize jumps straight to fit.
     const observer = new ResizeObserver(() => {
       const next = node.offsetWidth;
-      if (measured !== null && measured !== node.textContent && !reduced)
+      if (measured !== null && measured !== node.textContent && !reduced) {
         animate(width, next, grow);
-      else width.jump(next);
+      } else {
+        width.jump(next);
+      }
       measured = node.textContent;
     });
     observer.observe(node);
@@ -463,14 +489,22 @@ export function BarChart({
   showAverage = true,
   height = 176,
   formatValue = (value) => grouped.format(value),
+  labels: labelOverrides,
 }: BarChartProps) {
+  const text = {
+    explore: "explore by",
+    highest: "Highest",
+    lowest: "Lowest",
+    noData: "No data",
+    ...labelOverrides,
+  };
   const reduced = useReducedMotionSafe();
   const figure = useRef<HTMLElement>(null);
   const plot = useRef<HTMLDivElement>(null);
-  const inView = useInView(figure, { once: true, amount: 0.35 });
+  const inView = useInView(figure, { amount: 0.35, once: true });
   const titleId = useId();
-  const count = Math.max(data.length, 1),
-    last = data.length - 1;
+  const count = Math.max(data.length, 1);
+  const last = data.length - 1;
   const average = data.length ? data.reduce((sum, item) => sum + item.value, 0) / data.length : 0;
   const peak = data.reduce((max, item) => Math.max(max, item.value), 0);
   const { top, ticks } = useMemo(() => scaleFor(peak), [peak]);
@@ -479,10 +513,10 @@ export function BarChart({
 
   // Bars that join an existing chart grow outward from the ones that stayed; the first reveal runs left to right.
   const [known, setKnown] = useState(() => ({
-    signature,
-    keys: new Set(data.map((item) => item.key)),
-    fresh: new Map<string, number>(),
     changes: 0,
+    fresh: new Map<string, number>(),
+    keys: new Set(data.map((item) => item.key)),
+    signature,
   }));
   const [active, setActive] = useState<number | null>(null);
   if (known.signature !== signature) {
@@ -492,10 +526,10 @@ export function BarChart({
       .sort((a, b) => a.place - b.place);
     const step = Math.min(stagger.item, 0.32 / Math.max(1, incoming.length));
     setKnown({
-      signature,
-      keys: new Set(data.map((item) => item.key)),
-      fresh: new Map(incoming.map((item, rank) => [item.key, rank * step])),
       changes: known.changes + 1,
+      fresh: new Map(incoming.map((item, rank) => [item.key, rank * step])),
+      keys: new Set(data.map((item) => item.key)),
+      signature,
     });
     setActive(null);
   }
@@ -504,21 +538,22 @@ export function BarChart({
   const scrubbing = index !== null && last >= 0;
   const shownValue = scrubbing ? data[index]!.value : average;
   // Headline copy moves the way the data did: a larger value rises from below, a later day arrives from below too.
-  const [trend, setTrend] = useState({ value: shownValue, index, valueWay: 1, indexWay: 1 });
-  if (trend.value !== shownValue || trend.index !== index)
+  const [trend, setTrend] = useState({ index, indexWay: 1, value: shownValue, valueWay: 1 });
+  if (trend.value !== shownValue || trend.index !== index) {
     setTrend({
       value: shownValue,
       index,
       valueWay: shownValue === trend.value ? trend.valueWay : shownValue > trend.value ? 1 : -1,
       indexWay: index === null || trend.index === null ? 1 : Math.sign(index - trend.index) || 1,
     });
+  }
 
   const width = useMotionValue(0);
   const unitShare = useMotionValue(1 / count);
   const scale = useMotionValue(top);
   const mean = useMotionValue(0);
   const cursor = useMotionValue(0);
-  const frame = useMemo(() => ({ width, unit: unitShare }), [width, unitShare]);
+  const frame = useMemo(() => ({ unit: unitShare, width }), [width, unitShare]);
 
   // The chart draws in its own pixels; the width is read before paint and followed on resize. Axis labels wait for it, then thin out where they would collide.
   const [plotWidth, setPlotWidth] = useState(0);
@@ -528,9 +563,11 @@ export function BarChart({
     ...new Set(data.map((item) => item.axisLabel).filter((text): text is string => !!text)),
   ].join("\n");
   useLayoutEffect(() => {
-    const node = plot.current,
-      ruler = measure.current;
-    if (!node || !ruler) return;
+    const node = plot.current;
+    const ruler = measure.current;
+    if (!node || !ruler) {
+      return;
+    }
     const read = () => {
       width.set(node.clientWidth);
       setPlotWidth(node.clientWidth);
@@ -543,7 +580,9 @@ export function BarChart({
       );
     };
     read();
-    if (typeof ResizeObserver === "undefined") return;
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
     const observer = new ResizeObserver(read);
     observer.observe(node);
     observer.observe(ruler);
@@ -573,7 +612,9 @@ export function BarChart({
       mean.jump(average);
       return;
     }
-    if (!inView) return;
+    if (!inView) {
+      return;
+    }
     const first = !meanStarted.current;
     meanStarted.current = true;
     return soon(() => animate(mean, average, first ? { ...settle, delay: 0.12 } : settle));
@@ -587,9 +628,13 @@ export function BarChart({
       return;
     }
     const place = last - index;
-    if (reduced || !wasScrubbing.current) cursor.jump(place);
+    if (reduced || !wasScrubbing.current) {
+      cursor.jump(place);
+    }
     wasScrubbing.current = true;
-    if (reduced) return;
+    if (reduced) {
+      return;
+    }
     const controls = animate(cursor, place, glide);
     return () => controls.stop();
   }, [cursor, index, last, reduced]);
@@ -602,7 +647,9 @@ export function BarChart({
 
   const pointAt = (clientX: number) => {
     const rect = plot.current?.getBoundingClientRect();
-    if (!rect?.width) return last;
+    if (!rect?.width) {
+      return last;
+    }
     const place = Math.floor(((rect.right - clientX) / rect.width) * count);
     return clamp(last - place, 0, last);
   };
@@ -612,40 +659,48 @@ export function BarChart({
       setActive(null);
       return;
     }
-    const from = index ?? last + 1,
-      page = Math.min(7, count);
+    const from = index ?? last + 1;
+    const page = Math.min(7, count);
     const next = (
       {
-        ArrowLeft: from - 1,
         ArrowDown: from - 1,
+        ArrowLeft: from - 1,
         ArrowRight: index === null ? last : from + 1,
         ArrowUp: index === null ? last : from + 1,
+        End: last,
+        Home: 0,
         PageDown: from - page,
         PageUp: from + page,
-        Home: 0,
-        End: last,
       } as Record<string, number>
     )[event.key];
-    if (next === undefined || last < 0) return;
+    if (next === undefined || last < 0) {
+      return;
+    }
     event.preventDefault();
     setActive(clamp(next, 0, last));
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "mouse") event.currentTarget.setPointerCapture?.(event.pointerId);
+    if (event.pointerType !== "mouse") {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    }
     setActive(pointAt(event.clientX));
   };
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === "mouse" || event.buttons) setActive(pointAt(event.clientX));
+    if (event.pointerType === "mouse" || event.buttons) {
+      setActive(pointAt(event.clientX));
+    }
   };
   const release = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "mouse") setActive(null);
+    if (event.pointerType !== "mouse") {
+      setActive(null);
+    }
   };
 
   const scrubbed = scrubbing ? data[index] : null;
   const reading = scrubbed ?? data[last];
   const valueText = reading
     ? `${reading.label}: ${formatValue(reading.value)}${suffix}`
-    : "No data";
+    : text.noData;
   const highest = data.reduce<BarChartDatum | null>(
     (best, item) => (!best || item.value > best.value ? item : best),
     null,
@@ -654,7 +709,7 @@ export function BarChart({
     (best, item) => (!best || item.value < best.value ? item : best),
     null,
   );
-  const summary = `${label}, ${period}. ${averageLabel} ${formatValue(Math.round(average))}${suffix}.${highest ? ` Highest ${highest.label}, ${formatValue(highest.value)}${suffix}.` : ""}${lowest && lowest !== highest ? ` Lowest ${lowest.label}, ${formatValue(lowest.value)}${suffix}.` : ""}`;
+  const summary = `${label}, ${period}. ${averageLabel} ${formatValue(Math.round(average))}${suffix}.${highest ? ` ${text.highest} ${highest.label}, ${formatValue(highest.value)}${suffix}.` : ""}${lowest && lowest !== highest ? ` ${text.lowest} ${lowest.label}, ${formatValue(lowest.value)}${suffix}.` : ""}`;
   const shown = inView || reduced;
   const avoid = showAverage ? meanY : null;
 
@@ -735,7 +790,7 @@ export function BarChart({
                 initial={false}
                 animate={{ opacity: shown ? 1 : 0 }}
                 transition={
-                  reduced ? { duration: 0 } : { duration: duration.standard, delay: 0.12 }
+                  reduced ? { duration: 0 } : { delay: 0.12, duration: duration.standard }
                 }
               />
             )}
@@ -760,7 +815,7 @@ export function BarChart({
               style={{ y: meanY }}
               initial={false}
               animate={{ opacity: shown ? 1 : 0 }}
-              transition={reduced ? { duration: 0 } : { duration: duration.standard, delay: 0.12 }}
+              transition={reduced ? { duration: 0 } : { delay: 0.12, duration: duration.standard }}
             >
               <motion.span className={styles.tickText}>{meanText}</motion.span>
             </motion.span>
@@ -798,7 +853,7 @@ export function BarChart({
           className={styles.scrubber}
           role="slider"
           tabIndex={0}
-          aria-label={`${label}, explore by ${categoryLabel.toLowerCase()}`}
+          aria-label={`${label}, ${text.explore} ${categoryLabel.toLowerCase()}`}
           aria-orientation="horizontal"
           aria-valuemin={1}
           aria-valuemax={Math.max(1, data.length)}
@@ -809,13 +864,16 @@ export function BarChart({
           onPointerUp={release}
           onPointerCancel={() => setActive(null)}
           onPointerLeave={(event) => {
-            if (event.pointerType === "mouse") setActive(null);
+            if (event.pointerType === "mouse") {
+              setActive(null);
+            }
           }}
           onKeyDown={onKeyDown}
           onBlur={() => setActive(null)}
           onFocus={(event) => {
-            if (event.currentTarget.matches(":focus-visible") && last >= 0)
+            if (event.currentTarget.matches(":focus-visible") && last >= 0) {
               setActive((current) => current ?? last);
+            }
           }}
         />
       </div>

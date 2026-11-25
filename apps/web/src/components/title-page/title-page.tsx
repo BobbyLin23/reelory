@@ -8,8 +8,9 @@ import { ExpandableText } from "@/components/arc/expandable-text/expandable-text
 import { Select } from "@/components/arc/select/select";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { AddToListDialog } from "@/components/lists/add-to-list-dialog";
+import { useI18n } from "@/i18n/i18n";
 import type { LibraryStatus } from "@/utils/media";
-import { LIBRARY_STATUS_ACTIONS, formatVote, tmdbImageUrl } from "@/utils/media";
+import { LIBRARY_STATUSES, formatVote, libraryStatusLabel, tmdbImageUrl } from "@/utils/media";
 
 import { LogSheet } from "./log-sheet";
 import { SeriesProgressSection } from "./series-progress-section";
@@ -23,19 +24,17 @@ interface TitlePageProps {
   tmdbId: number;
 }
 
-const STATUS_OPTIONS = LIBRARY_STATUS_ACTIONS.map(({ label, status }) => ({
-  label,
-  value: status,
-}));
 const POSTER_LIMIT = 3;
 
 const TitlePosters = ({ paths, title }: { paths: string[]; title: string }) => {
+  const { t } = useI18n();
   const [index, setIndex] = useState(0);
   const [loaded, setLoaded] = useState(() => new Set([paths[0]]));
+  const alt = t("title.posterAlt", { title });
   if (paths.length < 2) {
     return (
       <img
-        alt={`Poster for ${title}`}
+        alt={alt}
         className={styles.poster}
         src={tmdbImageUrl(paths[0] ?? null, "w500") ?? undefined}
       />
@@ -45,8 +44,16 @@ const TitlePosters = ({ paths, title }: { paths: string[]; title: string }) => {
   return (
     <Carousel
       index={index}
-      label={`${title} posters`}
-      slideLabel={(position, count) => `Poster ${position + 1} of ${count}`}
+      labels={{
+        chooseSlide: t("arc.carousel.choose"),
+        nextSlide: t("arc.carousel.next"),
+        pauseRotation: t("arc.carousel.pause"),
+        previousSlide: t("arc.carousel.previous"),
+        slides: t("arc.carousel.slides"),
+        startRotation: t("arc.carousel.play"),
+      }}
+      label={t("title.postersLabel", { title })}
+      slideLabel={(position, count) => t("title.posterPosition", { count, position: position + 1 })}
       slideSize="100cqw"
       onIndexChange={(next) => {
         setIndex(next);
@@ -56,7 +63,7 @@ const TitlePosters = ({ paths, title }: { paths: string[]; title: string }) => {
       {paths.map((path) => (
         <div className={styles.poster} key={path}>
           {loaded.has(path) ? (
-            <img alt={`Poster for ${title}`} src={tmdbImageUrl(path, "w500") ?? undefined} />
+            <img alt={alt} src={tmdbImageUrl(path, "w500") ?? undefined} />
           ) : null}
         </div>
       ))}
@@ -97,9 +104,14 @@ const TitleHero = ({
   voteAverage: number;
   year: number | null;
 }) => {
+  const { locale, t } = useI18n();
   const paths = [...new Set([posterPath, ...(posters ?? []).map(({ filePath }) => filePath)])]
     .filter((path): path is string => !!path)
     .slice(0, POSTER_LIMIT);
+  const statusOptions = LIBRARY_STATUSES.map((status) => ({
+    label: libraryStatusLabel(status, locale),
+    value: status,
+  }));
 
   return (
     <div className={backdropUrl === null ? styles.intro : styles.introWithBackdrop}>
@@ -119,7 +131,7 @@ const TitleHero = ({
           <p className={styles.meta}>
             {year === null ? null : <span>{year}</span>}
             {runtimeLabel === null ? null : <span>{runtimeLabel}</span>}
-            <span className={styles.score}>TMDB {formatVote(voteAverage)}</span>
+            <span className={styles.score}>TMDB {formatVote(voteAverage, locale)}</span>
           </p>
           {genres.length === 0 ? null : (
             <div className={styles.genres}>
@@ -134,28 +146,28 @@ const TitleHero = ({
         <div className={styles.recording}>
           <div className={styles.actions}>
             <Button size="lg" type="button" onClick={onLog}>
-              Log a watch
+              {t("title.logWatch")}
             </Button>
             <Button size="lg" type="button" variant="secondary" onClick={onAddToList}>
-              Add to list
+              {t("title.addToList")}
             </Button>
           </div>
           <div className={styles.status}>
             <Select
               className={styles.statusTrigger}
-              label="Watch status"
-              options={STATUS_OPTIONS}
-              placeholder="Not set"
+              label={t("title.statusLabel")}
+              options={statusOptions}
+              placeholder={t("title.notSet")}
               value={libraryStatus ?? ""}
               onValueChange={(value) => {
-                const choice = LIBRARY_STATUS_ACTIONS.find(({ status }) => status === value);
-                if (choice && pendingStatus === null && choice.status !== libraryStatus) {
-                  onStatus(choice.status);
+                const choice = LIBRARY_STATUSES.find((status) => status === value);
+                if (choice && pendingStatus === null && choice !== libraryStatus) {
+                  onStatus(choice);
                 }
               }}
             />
             <span className="sr-only" role="status">
-              {pendingStatus === null ? "" : "Saving watch status"}
+              {pendingStatus === null ? "" : t("title.savingStatus")}
             </span>
           </div>
           {statusError === null ? null : (
@@ -167,9 +179,14 @@ const TitleHero = ({
         {overview === "" ? null : (
           <section aria-labelledby="overview-heading" className={styles.synopsis}>
             <h2 className={styles.heading} id="overview-heading">
-              Overview
+              {t("title.overview")}
             </h2>
-            <ExpandableText className={styles.overview} lines={3}>
+            <ExpandableText
+              className={styles.overview}
+              lessLabel={t("common.showLess")}
+              lines={3}
+              moreLabel={t("common.readMore")}
+            >
               {overview}
             </ExpandableText>
           </section>
@@ -180,23 +197,26 @@ const TitleHero = ({
 };
 
 const TitleError = ({ error, onRetry }: { error: unknown; onRetry: () => Promise<unknown> }) => {
+  const { t } = useI18n();
+
   if (errorCode(error) === "NOT_FOUND") {
     return (
-      <Alert title="Title not found" tone="warning">
-        This film or series is not in TMDB, or the link is wrong.
+      <Alert title={t("title.notFound")} tone="warning">
+        {t("title.notFoundDescription")}
       </Alert>
     );
   }
   return (
-    <Alert title="Could not load this title" tone="danger">
+    <Alert title={t("title.loadError")} tone="danger">
       <Button type="button" variant="secondary" onClick={onRetry}>
-        Try again
+        {t("common.tryAgain")}
       </Button>
     </Alert>
   );
 };
 
 export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
+  const { t } = useI18n();
   const page = useTitlePage(mediaType, tmdbId);
   const [listOpen, setListOpen] = useState(false);
 
@@ -206,7 +226,7 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
 
   return (
     <div className={styles.page}>
-      <Skeleton label="Loading title" lines={6} loading={page.detailPending}>
+      <Skeleton label={t("title.loading")} lines={6} loading={page.detailPending}>
         {page.title === "" ? null : (
           <TitleHero
             backdropUrl={page.backdropUrl}

@@ -30,6 +30,36 @@ import styles from "./inline-edit.module.css";
  * optimistically and a check draws once the save lands; Escape rolls the text back. A failed save restores the last saved value and says why.
  * Use a regular form when several fields must be saved together.
  */
+export interface InlineEditLabels {
+  activate: string;
+  editHint: string;
+  multilineEditHint: string;
+  saving: string;
+  saved: string;
+  failed: string;
+  retry: string;
+  save: string;
+  cancel: string;
+  valueLabel: string;
+}
+
+const defaultLabels: InlineEditLabels = {
+  activate: "Activate to edit.",
+  cancel: "Cancel editing",
+  editHint: "Enter saves, Escape cancels.",
+  failed: "Couldn’t save “{failed}”, so the last saved {noun} is back.",
+  multilineEditHint: "Enter saves, Shift+Enter adds a line break, Escape cancels.",
+  retry: "Try again",
+  save: "Save {noun}",
+  saved: "{label} saved",
+  saving: "Saving {label}",
+  valueLabel: "{label}: {value}",
+};
+
+/** Fills `{placeholders}` in a label template. */
+const fill = (template: string, values: Record<string, string>) =>
+  template.replaceAll(/\{(\w+)\}/gu, (_match, name: string) => values[name] ?? "");
+
 export interface InlineEditProps {
   /** The saved value. A new value from outside replaces the text while it is not being edited. */
   value: string;
@@ -47,6 +77,8 @@ export interface InlineEditProps {
   variant?: "title" | "body";
   /** The element that holds the text, so a title can stay a heading. */
   as?: "span" | "p" | "h1" | "h2" | "h3";
+  /** Localized copy for the edit, save, and rollback states. */
+  labels?: Partial<InlineEditLabels>;
   className?: string;
 }
 
@@ -77,15 +109,15 @@ function useReduced() {
 /** Text rises in from a soft blur. A rollback runs the other way, dropping the old words down and the saved ones in from above. */
 const textMotion: Variants = {
   enter: (direction: number) => ({
+    filter: blur(motionTokens.blur.soft),
     opacity: 0,
     y: `${direction * 0.3}em`,
-    filter: blur(motionTokens.blur.soft),
   }),
   exit: (direction: number) => ({
-    opacity: 0,
-    y: `${direction * -0.3}em`,
     filter: blur(motionTokens.blur.subtle),
+    opacity: 0,
     transition: { duration: motionTokens.duration.fast, ease: standard },
+    y: `${direction * -0.3}em`,
   }),
   rest: {
     filter: blur(0),
@@ -222,8 +254,10 @@ export function InlineEdit({
   multiline = false,
   variant = "title",
   as: Tag = "span",
+  labels: labelOverrides,
   className,
 }: InlineEditProps) {
+  const text = { ...defaultLabels, ...labelOverrides };
   const reduced = useReduced();
   const ids = useId();
   const displayHintId = `${ids}-display`;
@@ -425,7 +459,7 @@ export function InlineEdit({
     }
     // Trimmed spaces would shift the text in one frame, so a cleaned value arrives with the text motion instead.
     if (next !== draft) {
-      setLayer((current) => ({ key: current.key + 1, direction: 1 }));
+      setLayer((current) => ({ direction: 1, key: current.key + 1 }));
     }
     if (next === shown) {
       return;
@@ -434,7 +468,7 @@ export function InlineEdit({
     const run = ++saveRun.current;
     setShown(next);
     setPhase("saving");
-    setAnnouncement(`Saving ${label.toLowerCase()}`);
+    setAnnouncement(fill(text.saving, { label: label.toLowerCase() }));
     Promise.resolve()
       .then(() => onSave(next))
       .then(
@@ -444,7 +478,7 @@ export function InlineEdit({
           }
           setCommitted(next);
           setPhase("saved");
-          setAnnouncement(`${label} saved`);
+          setAnnouncement(fill(text.saved, { label }));
           later(() => setPhase((current) => (current === "saved" ? "idle" : current)), 1800);
         },
         () => {
@@ -468,7 +502,7 @@ export function InlineEdit({
     setError(null);
     focusDisplay.current = true;
     if (draft !== shown) {
-      setLayer((current) => ({ key: current.key + 1, direction: -1 }));
+      setLayer((current) => ({ direction: -1, key: current.key + 1 }));
     }
   }
 
@@ -544,9 +578,9 @@ export function InlineEdit({
                 aria-hidden="true"
               />
               <span>
-                {`Couldn’t save “${failed}”, so the last saved ${noun} is back.`}{" "}
+                {fill(text.failed, { failed, noun })}{" "}
                 <button type="button" className={styles.retry} onClick={retry}>
-                  Try again
+                  {text.retry}
                 </button>
               </span>
             </>
@@ -595,7 +629,7 @@ export function InlineEdit({
             className={styles.display}
             onClick={onDisplayClick}
             tabIndex={editing ? -1 : undefined}
-            aria-label={`${label}: ${shown || placeholder}`}
+            aria-label={fill(text.valueLabel, { label, value: shown || placeholder })}
             aria-describedby={describedBy(displayHintId)}
             aria-disabled={saving || undefined}
           >
@@ -657,7 +691,7 @@ export function InlineEdit({
                       <button
                         type="button"
                         className={styles.save}
-                        aria-label={`Save ${noun}`}
+                        aria-label={fill(text.save, { noun })}
                         onPointerDown={(event) => event.preventDefault()}
                         onClick={() => submit("button")}
                       >
@@ -666,7 +700,7 @@ export function InlineEdit({
                       <button
                         type="button"
                         className={styles.cancel}
-                        aria-label="Cancel editing"
+                        aria-label={text.cancel}
                         onPointerDown={(event) => event.preventDefault()}
                         onClick={cancel}
                       >
@@ -703,12 +737,10 @@ export function InlineEdit({
       </Tag>
       <Reveal id={messageId} message={message} reduced={reduced} />
       <span id={displayHintId} className={styles.srOnly}>
-        Activate to edit.
+        {text.activate}
       </span>
       <span id={editHintId} className={styles.srOnly}>
-        {multiline
-          ? "Enter saves, Shift+Enter adds a line break, Escape cancels."
-          : "Enter saves, Escape cancels."}
+        {multiline ? text.multilineEditHint : text.editHint}
       </span>
       <span className={styles.srOnly} role="status">
         {announcement}

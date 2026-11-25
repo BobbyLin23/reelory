@@ -9,6 +9,8 @@ import { useToday } from "@/components/arc/lib/use-today";
 import { Rating } from "@/components/arc/rating/rating";
 import { Select } from "@/components/arc/select/select";
 import { Textarea } from "@/components/arc/textarea/textarea";
+import { useI18n } from "@/i18n/i18n";
+import type { MessageKey, MessageParams } from "@/i18n/messages";
 import { fromIsoDate, ratingToStars, starsToRating, toIsoDate } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
@@ -36,12 +38,16 @@ interface LogSheetProps {
 
 const none = "none";
 
-const episodeOptions = (season: TmdbSeasonDetail | undefined) => {
+const episodeOptions = (
+  season: TmdbSeasonDetail | undefined,
+  t: (key: MessageKey, params?: MessageParams) => string,
+) => {
+  const choose = { label: t("log.chooseEpisode"), value: none };
   if (season === undefined) {
-    return [{ label: "Choose an episode", value: none }];
+    return [choose];
   }
   return [
-    { label: "Choose an episode", value: none },
+    choose,
     ...season.episodes.map((episode) => ({
       label: `${episode.episodeNumber}. ${episode.name}`,
       value: String(episode.episodeNumber),
@@ -56,6 +62,7 @@ const LogForm = ({
   seasons,
   tmdbId,
 }: Omit<LogSheetProps, "formKey" | "open" | "title">) => {
+  const { locale, t } = useI18n();
   const today = useToday();
   const errorId = useId();
   const queryClient = useQueryClient();
@@ -109,7 +116,7 @@ const LogForm = ({
       ]);
       onOpenChange(false);
     } catch {
-      setError("We could not save this watch. Check your connection and try again.");
+      setError(t("log.saveError"));
     }
   };
 
@@ -123,9 +130,20 @@ const LogForm = ({
       }}
     >
       <DatePicker
-        description="Clear the date if you do not remember the day."
-        label="Watch date"
-        placeholder="Unknown"
+        description={t("log.dateDescription")}
+        label={t("log.dateLabel")}
+        labels={{
+          calendar: t("arc.date.calendar"),
+          chooseDay: t("arc.date.chooseDay"),
+          clear: t("common.clear"),
+          nextMonth: t("arc.calendar.nextMonth"),
+          previousMonth: t("arc.calendar.previousMonth"),
+          selected: t("arc.date.selected"),
+          today: t("arc.calendar.today"),
+          todayFull: t("arc.calendar.todayFull"),
+        }}
+        locale={locale}
+        placeholder={t("log.datePlaceholder")}
         showToday
         value={resolvedDate === null ? undefined : fromIsoDate(resolvedDate)}
         onChange={(date) => setWatchedOn(date === undefined ? null : toIsoDate(date))}
@@ -133,15 +151,18 @@ const LogForm = ({
       <Rating
         allowClear
         allowHalf
-        emptyLabel="No rating"
-        label="Rating"
+        clearedLabel={t("arc.rating.cleared")}
+        emptyLabel={t("log.noRating")}
+        formatSpokenValue={(value, max) => t("arc.rating.spoken", { max, value })}
+        formatValue={(value, max) => t("arc.rating.value", { max, value })}
+        label={t("log.ratingLabel")}
         max={5}
         value={stars}
         onChange={setStars}
       />
       <Textarea
-        description="Only you can see this."
-        label="Review"
+        description={t("log.reviewDescription")}
+        label={t("log.reviewLabel")}
         rows={4}
         value={review}
         onChange={(event) => setReview(event.target.value)}
@@ -149,9 +170,9 @@ const LogForm = ({
       {isTv ? (
         <div className={styles.pair}>
           <Select
-            label="Season"
+            label={t("log.seasonLabel")}
             options={[
-              { label: "Whole series", value: none },
+              { label: t("log.wholeSeries"), value: none },
               ...seasons.map((item) => ({
                 label: item.name,
                 value: String(item.seasonNumber),
@@ -165,8 +186,8 @@ const LogForm = ({
           />
           <Select
             disabled={season === none}
-            label="Episode"
-            options={episodeOptions(seasonQuery.data)}
+            label={t("log.episodeLabel")}
+            options={episodeOptions(seasonQuery.data, t)}
             value={episode}
             onValueChange={setEpisode}
           />
@@ -179,10 +200,10 @@ const LogForm = ({
       )}
       <div className={styles.formActions}>
         <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button disabled={!canSave} loading={pending} type="submit">
-          {entry === null ? "Save watch" : "Save changes"}
+          {entry === null ? t("log.save") : t("common.saveChanges")}
         </Button>
       </div>
     </form>
@@ -198,22 +219,27 @@ export const LogSheet = ({
   seasons,
   title,
   tmdbId,
-}: LogSheetProps) => (
-  <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent
-      description={`Private to you. ${title}.`}
-      title={entry === null ? "Log a watch" : "Edit watch"}
-    >
-      {open ? (
-        <LogForm
-          key={formKey}
-          entry={entry}
-          mediaType={mediaType}
-          seasons={seasons}
-          tmdbId={tmdbId}
-          onOpenChange={onOpenChange}
-        />
-      ) : null}
-    </DialogContent>
-  </Dialog>
-);
+}: LogSheetProps) => {
+  const { t } = useI18n();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        closeLabel={t("arc.dialog.close")}
+        description={t("log.description", { title })}
+        title={entry === null ? t("log.titleNew") : t("log.titleEdit")}
+      >
+        {open ? (
+          <LogForm
+            key={formKey}
+            entry={entry}
+            mediaType={mediaType}
+            seasons={seasons}
+            tmdbId={tmdbId}
+            onOpenChange={onOpenChange}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+};

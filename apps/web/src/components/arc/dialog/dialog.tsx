@@ -46,6 +46,8 @@ export interface DialogContentProps extends ComponentPropsWithoutRef<
 > {
   title: string;
   description?: string;
+  /** Accessible name for the close button. */
+  closeLabel?: string;
   children: ReactNode;
 }
 
@@ -96,6 +98,7 @@ export function DialogContent({
   description,
   children,
   className,
+  closeLabel = "Close dialog",
   onPointerDownOutside,
   ...props
 }: DialogContentProps) {
@@ -130,7 +133,7 @@ export function DialogContent({
             </DialogPrimitive.Description>
           ) : null}
         </div>
-        <DialogPrimitive.Close className={styles.close} aria-label="Close dialog">
+        <DialogPrimitive.Close className={styles.close} aria-label={closeLabel}>
           <X size={16} strokeWidth={1.75} aria-hidden="true" />
         </DialogPrimitive.Close>
       </div>

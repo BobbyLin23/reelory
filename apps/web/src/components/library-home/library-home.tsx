@@ -15,12 +15,15 @@ import type { Segment } from "@/components/arc/segmented-control/segmented-contr
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { PageIntro } from "@/components/page-intro";
 import { SeriesProgress } from "@/components/series-progress/series-progress";
+import { useI18n } from "@/i18n/i18n";
 import type { EpisodePosition, LibraryStatus, MediaType } from "@/utils/media";
 import {
-  LIBRARY_STATUS_ACTIONS,
+  LIBRARY_STATUSES,
   formatEpisode,
   formatStars,
   formatWatchDate,
+  isLibraryStatus,
+  libraryStatusLabel,
   nextEpisode,
   tmdbImageUrl,
   toIsoDate,
@@ -46,31 +49,8 @@ interface LibraryItem {
 type LibraryView = "grid" | "list";
 
 const VIEW_KEY = "reelory.library.view";
-const VIEW_OPTIONS: Segment[] = [
-  { label: "Grid", value: "grid" },
-  { label: "List", value: "list" },
-];
-const KIND_LABEL: Record<MediaType, string> = { movie: "Film", tv: "Series" };
-const EMPTY_STATES: Record<LibraryStatus, { description: string; title: string }> = {
-  want: {
-    description: "Titles you want to watch appear here. Open a title and choose Want.",
-    title: "Nothing in Want yet",
-  },
-  watching: {
-    description:
-      "Open a title and choose Watching. Series progress appears here as you log episodes.",
-    title: "Nothing in Watching yet",
-  },
-  watched: {
-    description: "Open a title and log a watch. It appears here with its date and rating.",
-    title: "Nothing watched yet",
-  },
-};
 
 const isView = (value: string | null): value is LibraryView => value === "grid" || value === "list";
-
-const isStatus = (value: string): value is LibraryStatus =>
-  LIBRARY_STATUS_ACTIONS.some((action) => action.status === value);
 
 /** Storage can be unavailable in a private window, so a failed read only means the default view. */
 const readView = (): LibraryView | null => {
@@ -94,9 +74,8 @@ const titlePath = (entry: LibraryItem) => `/title/${entry.mediaType}/${entry.tmd
 
 const titleKey = (entry: LibraryItem) => `${entry.mediaType}:${entry.tmdbId}`;
 
-const statusLabel = Object.fromEntries(
-  LIBRARY_STATUS_ACTIONS.map(({ label, status }) => [status, label]),
-);
+const kindLabel = (mediaType: MediaType, t: (key: "common.film" | "common.series") => string) =>
+  t(mediaType === "movie" ? "common.film" : "common.series");
 
 interface RailItem {
   entry: LibraryItem;
@@ -124,6 +103,7 @@ const Poster = ({
 };
 
 const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
+  const { locale, t } = useI18n();
   const [query, setQuery] = useState("");
   const field = useRef<HTMLInputElement>(null);
   const term = query.trim().toLowerCase();
@@ -132,11 +112,11 @@ const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
     : [];
   let message = "";
   if (entries?.length === 0) {
-    message = "Your library is empty. Use Add on Records to find a title to save.";
+    message = t("records.searchEmpty");
   } else if (term && matches.length === 0) {
-    message = "No saved titles match. Try another title.";
+    message = t("records.searchNoMatch");
   } else if (matches.length > 0) {
-    message = matches.length === 1 ? "1 title found" : `${matches.length} titles found`;
+    message = t("count.titlesFound", { count: matches.length });
   }
 
   return (
@@ -150,12 +130,13 @@ const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
       <DialogTrigger asChild>
         <Button disabled={entries === undefined} size="lg" type="button" variant="secondary">
           <Search aria-hidden="true" />
-          Search
+          {t("records.searchButton")}
         </Button>
       </DialogTrigger>
       <DialogContent
-        description="Find films and series you’ve saved, regardless of watch status."
-        title="Search your library"
+        closeLabel={t("arc.dialog.close")}
+        description={t("records.searchDescription")}
+        title={t("records.searchTitle")}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           field.current?.focus();
@@ -165,8 +146,9 @@ const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
           <SearchField
             ref={field}
             autoComplete="off"
-            label="Film or series title"
-            placeholder="Search by title"
+            clearLabel={t("arc.search.clear")}
+            label={t("records.searchLabel")}
+            placeholder={t("records.searchPlaceholder")}
             value={query}
             onValueChange={setQuery}
           />
@@ -174,7 +156,7 @@ const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
             {message}
           </output>
           {matches.length > 0 ? (
-            <ul aria-label="Matching saved titles" className={styles.searchResults}>
+            <ul aria-label={t("records.searchResultsLabel")} className={styles.searchResults}>
               {matches.map((entry) => (
                 <li key={entry.id}>
                   <Link className={styles.searchResult} to={titlePath(entry)}>
@@ -182,7 +164,11 @@ const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
                     <span className={styles.searchCopy}>
                       <span className={styles.cardTitle}>{entry.title}</span>
                       <span className={styles.searchMeta}>
-                        {[KIND_LABEL[entry.mediaType], entry.year, statusLabel[entry.status]]
+                        {[
+                          kindLabel(entry.mediaType, t),
+                          entry.year,
+                          libraryStatusLabel(entry.status, locale),
+                        ]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>
@@ -199,10 +185,11 @@ const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
 };
 
 const WatchMeta = ({ watch }: { watch: LibraryItem["latestWatch"] }) => {
+  const { locale, t } = useI18n();
   if (watch === null || (watch.rating === null && watch.watchedOn === null)) {
     return null;
   }
-  const date = formatWatchDate(watch.watchedOn);
+  const date = formatWatchDate(watch.watchedOn, locale);
   const rating = watch.rating === null ? null : formatStars(watch.rating);
   return (
     <p className={styles.meta}>
@@ -217,8 +204,20 @@ const WatchMeta = ({ watch }: { watch: LibraryItem["latestWatch"] }) => {
         )}
       </span>
       <span className={styles.srOnly}>
-        {[date, rating === null ? null : `Rated ${rating} out of 5`].filter(Boolean).join(", ")}
+        {[date, rating === null ? null : t("records.searchRated", { value: rating })]
+          .filter(Boolean)
+          .join(", ")}
       </span>
+    </p>
+  );
+};
+
+const TitleMeta = ({ entry }: { entry: LibraryItem }) => {
+  const { t } = useI18n();
+
+  return (
+    <p className={styles.meta}>
+      {entry.year ?? t("common.noYear")} · {kindLabel(entry.mediaType, t)}
     </p>
   );
 };
@@ -231,9 +230,7 @@ const PosterGrid = ({ entries }: { entries: LibraryItem[] }) => (
           <Poster className={styles.cardPoster} path={entry.posterPath} size="w500" />
           <div className={styles.cardCopy}>
             <p className={styles.cardTitle}>{entry.title}</p>
-            <p className={styles.meta}>
-              {entry.year ?? "No year"} · {KIND_LABEL[entry.mediaType]}
-            </p>
+            <TitleMeta entry={entry} />
             <WatchMeta watch={entry.latestWatch} />
           </div>
         </Link>
@@ -250,9 +247,7 @@ const DenseList = ({ entries }: { entries: LibraryItem[] }) => (
           <Poster className={styles.poster} path={entry.posterPath} size="w185" />
           <div className={styles.copy}>
             <p className={styles.cardTitle}>{entry.title}</p>
-            <p className={styles.meta}>
-              {entry.year ?? "No year"} · {KIND_LABEL[entry.mediaType]}
-            </p>
+            <TitleMeta entry={entry} />
             <WatchMeta watch={entry.latestWatch} />
           </div>
         </Link>
@@ -271,61 +266,66 @@ const ContinueWatching = ({
   onAdvance: (entry: LibraryItem, next: EpisodePosition) => void;
   pendingKey: string | null;
   saveError: boolean;
-}) => (
-  <section aria-labelledby="continue-watching" className={styles.railSection}>
-    <div className={styles.railHeader}>
-      <h2 className={styles.railHeading} id="continue-watching">
-        Continue watching
-      </h2>
-      <p className={styles.railHint}>One tap marks the next episode watched.</p>
-    </div>
-    {saveError ? (
-      <p className={styles.error} role="alert">
-        We could not save that episode. Check your connection and try again.
-      </p>
-    ) : null}
-    <ul className={styles.rail}>
-      {items.map(({ entry, next, seasons, seasonsError }) => (
-        <li className={styles.railItem} key={entry.id}>
-          <Link className={styles.railLink} to={titlePath(entry)}>
-            <Poster className={styles.railPoster} path={entry.posterPath} size="w185" />
-            <span className={styles.railCopy}>
-              <span className={styles.cardTitle}>{entry.title}</span>
-            </span>
-          </Link>
-          {seasons === undefined ? (
-            seasonsError ? (
-              <p className={styles.railNote}>Episode counts are unavailable right now.</p>
+}) => {
+  const { locale, t } = useI18n();
+
+  return (
+    <section aria-labelledby="continue-watching" className={styles.railSection}>
+      <div className={styles.railHeader}>
+        <h2 className={styles.railHeading} id="continue-watching">
+          {t("records.continueWatching")}
+        </h2>
+        <p className={styles.railHint}>{t("records.continueHint")}</p>
+      </div>
+      {saveError ? (
+        <p className={styles.error} role="alert">
+          {t("records.advanceError")}
+        </p>
+      ) : null}
+      <ul className={styles.rail}>
+        {items.map(({ entry, next, seasons, seasonsError }) => (
+          <li className={styles.railItem} key={entry.id}>
+            <Link className={styles.railLink} to={titlePath(entry)}>
+              <Poster className={styles.railPoster} path={entry.posterPath} size="w185" />
+              <span className={styles.railCopy}>
+                <span className={styles.cardTitle}>{entry.title}</span>
+              </span>
+            </Link>
+            {seasons === undefined ? (
+              seasonsError ? (
+                <p className={styles.railNote}>{t("records.episodesUnavailable")}</p>
+              ) : (
+                <Skeleton label={t("records.loadingProgress")} lines={2} />
+              )
             ) : (
-              <Skeleton label="Loading series progress" lines={2} />
-            )
-          ) : (
-            <SeriesProgress
-              progress={entry.progress}
-              seasons={seasons}
-              watchedEpisodes={entry.progress?.watchedEpisodes ?? 0}
-            />
-          )}
-          {next === undefined ? null : next === null ? (
-            <p className={styles.railNote}>Every episode TMDB lists is watched.</p>
-          ) : (
-            <Button
-              className={styles.railAction}
-              loading={pendingKey === titleKey(entry)}
-              type="button"
-              variant="secondary"
-              onClick={() => onAdvance(entry, next)}
-            >
-              Mark {formatEpisode(next)} watched
-            </Button>
-          )}
-        </li>
-      ))}
-    </ul>
-  </section>
-);
+              <SeriesProgress
+                progress={entry.progress}
+                seasons={seasons}
+                watchedEpisodes={entry.progress?.watchedEpisodes ?? 0}
+              />
+            )}
+            {next === undefined ? null : next === null ? (
+              <p className={styles.railNote}>{t("records.allWatched")}</p>
+            ) : (
+              <Button
+                className={styles.railAction}
+                loading={pendingKey === titleKey(entry)}
+                type="button"
+                variant="secondary"
+                onClick={() => onAdvance(entry, next)}
+              >
+                {t("records.markWatched", { episode: formatEpisode(next, locale) })}
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
 
 export const LibraryHome = () => {
+  const { locale, t } = useI18n();
   const queryClient = useQueryClient();
   const libraryQuery = useQuery(orpc.library.overview.queryOptions());
   const [status, setStatus] = useState<LibraryStatus>("want");
@@ -356,10 +356,7 @@ export const LibraryHome = () => {
 
   const intro = (
     <header className={styles.pageHeader}>
-      <PageIntro
-        description="Your library of films and series, and what to watch next."
-        title="Records"
-      />
+      <PageIntro description={t("records.description")} title={t("records.title")} />
       <div className={styles.pageActions}>
         <LibrarySearch entries={libraryQuery.data?.entries} />
         <AddTitleDialog />
@@ -371,9 +368,9 @@ export const LibraryHome = () => {
     return (
       <div className={styles.page}>
         {intro}
-        <Alert title="Could not load your library" tone="danger">
+        <Alert title={t("records.loadError")} tone="danger">
           <Button type="button" variant="secondary" onClick={() => libraryQuery.refetch()}>
-            Try again
+            {t("common.tryAgain")}
           </Button>
         </Alert>
       </div>
@@ -390,11 +387,29 @@ export const LibraryHome = () => {
     };
   });
   const visible = entries.filter((entry) => entry.status === status);
-  const statusOptions: Segment[] = LIBRARY_STATUS_ACTIONS.map(({ label, status: value }) => ({
+  const statusOptions: Segment[] = LIBRARY_STATUSES.map((value) => ({
     accessory: <Badge size="sm">{counts[value]}</Badge>,
-    label,
+    label: libraryStatusLabel(value, locale),
     value,
   }));
+  const viewOptions: Segment[] = [
+    { label: t("records.grid"), value: "grid" },
+    { label: t("records.list"), value: "list" },
+  ];
+  const emptyStates: Record<LibraryStatus, { description: string; title: string }> = {
+    want: {
+      description: t("records.emptyWantDescription"),
+      title: t("records.emptyWantTitle"),
+    },
+    watched: {
+      description: t("records.emptyWatchedDescription"),
+      title: t("records.emptyWatchedTitle"),
+    },
+    watching: {
+      description: t("records.emptyWatchingDescription"),
+      title: t("records.emptyWatchingTitle"),
+    },
+  };
   const pendingKey =
     advance.isPending && advance.variables
       ? `${advance.variables.mediaType}:${advance.variables.tmdbId}`
@@ -421,23 +436,23 @@ export const LibraryHome = () => {
   return (
     <div className={styles.page}>
       {intro}
-      <Skeleton label="Loading your library" lines={6} loading={libraryQuery.isPending}>
+      <Skeleton label={t("records.loading")} lines={6} loading={libraryQuery.isPending}>
         <div className={styles.library}>
           <div className={styles.controls}>
             <SegmentedControl
-              label="Library status"
+              label={t("records.statusControl")}
               options={statusOptions}
               value={status}
               onValueChange={(value) => {
-                if (isStatus(value)) {
+                if (isLibraryStatus(value)) {
                   setStatus(value);
                 }
               }}
             />
             <SegmentedControl
               className={styles.viewControl}
-              label="Library view"
-              options={VIEW_OPTIONS}
+              label={t("records.viewControl")}
+              options={viewOptions}
               value={view}
               onValueChange={changeView}
             />
@@ -451,7 +466,7 @@ export const LibraryHome = () => {
             />
           ) : null}
           {visible.length === 0 ? (
-            <EmptyState {...EMPTY_STATES[status]} />
+            <EmptyState {...emptyStates[status]} />
           ) : view === "grid" ? (
             <PosterGrid entries={visible} />
           ) : (

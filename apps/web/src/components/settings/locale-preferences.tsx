@@ -2,13 +2,14 @@
 
 import type { TmdbLocale } from "@reelory/api/tmdb/locale";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
 import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { Select } from "@/components/arc/select/select";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import { useI18n } from "@/i18n/i18n";
 import { orpc } from "@/utils/orpc";
 
 import styles from "./locale-preferences.module.css";
@@ -80,8 +81,8 @@ const regions = [
   "AR",
 ];
 
-const languageNames = new Intl.DisplayNames(["en"], { type: "language" });
-const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+const languageNamesFor = (locale: string) => new Intl.DisplayNames([locale], { type: "language" });
+const regionNamesFor = (locale: string) => new Intl.DisplayNames([locale], { type: "region" });
 
 /** Keep a locale the request brought in selectable even when it is not a listed option. */
 const withCurrent = (options: Option[], value: string, fallbackLabel: string): Option[] =>
@@ -89,15 +90,20 @@ const withCurrent = (options: Option[], value: string, fallbackLabel: string): O
     ? options
     : [...options, { label: fallbackLabel, value }];
 
-const regionOptions = regions.map((code) => ({ label: regionNames.of(code) ?? code, value: code }));
-
 export function LocalePreferences({ defaultLocale }: { defaultLocale: TmdbLocale }) {
+  const { locale, t } = useI18n();
   const id = useId();
   const queryClient = useQueryClient();
   const preferences = useQuery(orpc.preferences.get.queryOptions());
   const save = useMutation(orpc.preferences.set.mutationOptions());
   const [changes, setChanges] = useState<Partial<TmdbLocale>>({});
   const [saved, setSaved] = useState(false);
+  const languageNames = useMemo(() => languageNamesFor(locale), [locale]);
+  const regionNames = useMemo(() => regionNamesFor(locale), [locale]);
+  const regionOptions = useMemo(
+    () => regions.map((code) => ({ label: regionNames.of(code) ?? code, value: code })),
+    [regionNames],
+  );
 
   const current = {
     language: changes.language ?? preferences.data?.language ?? defaultLocale.language,
@@ -129,21 +135,21 @@ export function LocalePreferences({ defaultLocale }: { defaultLocale: TmdbLocale
   return (
     <section aria-labelledby={`${id}-heading`} className={styles.section}>
       <h2 className={styles.heading} id={`${id}-heading`}>
-        Language and region
+        {t("settings.metadataTitle")}
       </h2>
 
-      <Skeleton label="Loading language and region" lines={2} loading={preferences.isPending}>
+      <Skeleton label={t("settings.loading")} lines={2} loading={preferences.isPending}>
         {preferences.isError ? (
-          <Alert title="Your preferences did not load" tone="danger">
+          <Alert title={t("settings.loadError")} tone="danger">
             <Button onClick={() => preferences.refetch()} size="sm" variant="secondary">
-              Try again
+              {t("common.tryAgain")}
             </Button>
           </Alert>
         ) : (
           <form className={styles.form} onSubmit={submit}>
             <Select
-              description="Titles, overviews, and genres appear in this language."
-              label="Metadata language"
+              description={t("settings.metadataDescription")}
+              label={t("settings.metadataLabel")}
               onValueChange={(language) => change({ language })}
               options={withCurrent(
                 languages,
@@ -153,8 +159,8 @@ export function LocalePreferences({ defaultLocale }: { defaultLocale: TmdbLocale
               value={current.language}
             />
             <Select
-              description="Streaming providers are shown for this region."
-              label="Watch region"
+              description={t("settings.regionDescription")}
+              label={t("settings.regionLabel")}
               onValueChange={(region) => change({ region })}
               options={withCurrent(
                 regionOptions,
@@ -165,14 +171,14 @@ export function LocalePreferences({ defaultLocale }: { defaultLocale: TmdbLocale
             />
 
             {save.isError ? (
-              <Alert title="Your preferences were not saved" tone="danger">
-                Check your connection and save again.
+              <Alert title={t("settings.saveError")} tone="danger">
+                {t("settings.saveHelp")}
               </Alert>
             ) : null}
 
             <div className={styles.actions}>
               <Button disabled={!dirty} loading={save.isPending} type="submit">
-                {saved && !dirty ? "Saved" : "Save changes"}
+                {saved && !dirty ? t("common.saved") : t("common.saveChanges")}
               </Button>
             </div>
           </form>

@@ -9,6 +9,7 @@ import { useToday } from "@/components/arc/lib/use-today";
 import { Select } from "@/components/arc/select/select";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { SeriesProgress } from "@/components/series-progress/series-progress";
+import { useI18n } from "@/i18n/i18n";
 import type { EpisodePosition } from "@/utils/media";
 import {
   episodesThrough,
@@ -23,9 +24,9 @@ import {
 } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
 
-import styles from "./title-page.module.css";
-
 import type { WatchLog } from "./title-sections";
+
+import styles from "./title-page.module.css";
 
 interface MarkedThrough {
   created: number;
@@ -59,6 +60,7 @@ const MarkThroughForm = ({
   seasons: TmdbTvDetail["seasons"];
   tmdbId: number;
 }) => {
+  const { locale, t } = useI18n();
   const today = useToday();
   const errorId = useId();
   const queryClient = useQueryClient();
@@ -84,7 +86,7 @@ const MarkThroughForm = ({
     const value = index + 1;
     return {
       disabled: inProgressSeason && value <= (progress?.episode ?? 0),
-      label: `Episode ${value}`,
+      label: t("series.episodeLabel", { number: value }),
       value: String(value),
     };
   });
@@ -97,8 +99,8 @@ const MarkThroughForm = ({
     if (episodes.length === 0) {
       setError(
         progress === null
-          ? "Pick an episode in a season TMDB knows about."
-          : `Pick an episode after ${formatEpisode(progress)}. Log an earlier one with Log a watch.`,
+          ? t("series.pickSeason")
+          : t("series.pickAfter", { episode: formatEpisode(progress, locale) }),
       );
       return;
     }
@@ -117,7 +119,7 @@ const MarkThroughForm = ({
       onMarked({ created: result.created, through: target });
       onOpenChange(false);
     } catch {
-      setError("We could not save those episodes. Check your connection and try again.");
+      setError(t("series.saveEpisodesError"));
     }
   };
 
@@ -131,7 +133,7 @@ const MarkThroughForm = ({
       }}
     >
       <Select
-        label="Season"
+        label={t("log.seasonLabel")}
         options={regular.map((season) => ({
           disabled: !isOpenSeason(season, progress),
           label: season.name,
@@ -147,15 +149,26 @@ const MarkThroughForm = ({
         }}
       />
       <Select
-        label="Through episode"
+        label={t("series.throughLabel")}
         options={episodeOptions}
         value={episode}
         onValueChange={setEpisode}
       />
       <DatePicker
-        description="Every episode you fill gets this date."
-        label="Watch date"
-        placeholder="Unknown"
+        description={t("series.dateDescription")}
+        label={t("log.dateLabel")}
+        labels={{
+          calendar: t("arc.date.calendar"),
+          chooseDay: t("arc.date.chooseDay"),
+          clear: t("common.clear"),
+          nextMonth: t("arc.calendar.nextMonth"),
+          previousMonth: t("arc.calendar.previousMonth"),
+          selected: t("arc.date.selected"),
+          today: t("arc.calendar.today"),
+          todayFull: t("arc.calendar.todayFull"),
+        }}
+        locale={locale}
+        placeholder={t("log.datePlaceholder")}
         showToday
         value={resolvedDate === null ? undefined : fromIsoDate(resolvedDate)}
         onChange={(date) => setWatchedOn(date === undefined ? null : toIsoDate(date))}
@@ -167,10 +180,12 @@ const MarkThroughForm = ({
       )}
       <div className={styles.formActions}>
         <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button disabled={target === null} loading={markThrough.isPending} type="submit">
-          {target === null ? "Mark through" : `Mark through ${formatEpisode(target)}`}
+          {target === null
+            ? t("series.markThroughButton")
+            : t("series.markThroughTarget", { episode: formatEpisode(target, locale) })}
         </Button>
       </div>
     </form>
@@ -188,6 +203,7 @@ export const SeriesProgressSection = ({
   tmdbId: number;
   watches: WatchLog[];
 }) => {
+  const { locale, t } = useI18n();
   const queryClient = useQueryClient();
   const [throughOpen, setThroughOpen] = useState(false);
   const [marked, setMarked] = useState<MarkedThrough | null>(null);
@@ -226,13 +242,13 @@ export const SeriesProgressSection = ({
   return (
     <section aria-labelledby="series-progress-heading" className={styles.section}>
       <h2 className={styles.heading} id="series-progress-heading">
-        Series progress
+        {t("series.progress")}
       </h2>
-      <Skeleton label="Loading series progress" lines={2} loading={isPending}>
+      <Skeleton label={t("series.loading")} lines={2} loading={isPending}>
         <div className={styles.progressBody}>
           <SeriesProgress progress={progress} seasons={seasons} watchedEpisodes={watched} />
           <p className={styles.progressCount}>
-            {watched} of {totals.episodeCount} episodes watched
+            {t("series.count", { total: totals.episodeCount, watched })}
           </p>
         </div>
       </Skeleton>
@@ -244,7 +260,9 @@ export const SeriesProgressSection = ({
           variant="secondary"
           onClick={() => void markNext()}
         >
-          {next === null ? "Nothing left to mark" : `Mark ${formatEpisode(next)} watched`}
+          {next === null
+            ? t("series.nothingLeft")
+            : t("series.markWatched", { episode: formatEpisode(next, locale) })}
         </Button>
         <Button
           disabled={next === null || isPending}
@@ -252,33 +270,34 @@ export const SeriesProgressSection = ({
           variant="secondary"
           onClick={() => setThroughOpen(true)}
         >
-          Mark through an episode
+          {t("series.markThrough")}
         </Button>
       </div>
-      {next === null ? (
-        <p className={styles.note}>
-          Every episode TMDB lists is watched. The series stays in Watching until you move it.
-        </p>
-      ) : null}
+      {next === null ? <p className={styles.note}>{t("series.allWatched")}</p> : null}
       {logNext.isError ? (
         <p className={styles.error} role="alert">
-          We could not save that episode. Check your connection and try again.
+          {t("series.saveError")}
         </p>
       ) : null}
       {marked === null ? null : (
         <p className={styles.note} role="status">
-          Marked {marked.created} {marked.created === 1 ? "episode" : "episodes"} through{" "}
-          {formatEpisode(marked.through)}.
+          {t("count.marked", {
+            count: marked.created,
+            episode: formatEpisode(marked.through, locale),
+          })}
         </p>
       )}
       <Dialog open={throughOpen} onOpenChange={setThroughOpen}>
         <DialogContent
+          closeLabel={t("arc.dialog.close")}
           description={
             progress === null
-              ? "Fills every episode through the one you pick. Episodes you already watched are skipped."
-              : `Fills every episode after ${formatEpisode(progress)} through the one you pick. Episodes you already watched are skipped.`
+              ? t("series.markThroughDescriptionNone")
+              : t("series.markThroughDescriptionProgress", {
+                  episode: formatEpisode(progress, locale),
+                })
           }
-          title="Mark through an episode"
+          title={t("series.markThroughTitle")}
         >
           {throughOpen ? (
             <MarkThroughForm
