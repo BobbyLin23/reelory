@@ -3,7 +3,7 @@
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { Variants } from "motion/react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { ButtonHTMLAttributes, FocusEvent, KeyboardEvent } from "react";
 
 import { Calendar } from "../calendar/calendar";
@@ -165,13 +165,33 @@ export function DatePicker({
   }, [open]);
 
   /** Closing hands focus back to the trigger when it was inside the calendar, so keyboard users never land on the page body. */
-  const close = () => {
+  const close = useCallback(() => {
     window.clearTimeout(closeTimer.current);
     if (popoverRef.current?.contains(document.activeElement)) {
       triggerRef.current?.focus();
     }
     setOpen(false);
-  };
+  }, []);
+
+  /**
+   * Escape closes the calendar before anything under it. A modal dialog dismisses on Escape from a capture listener on
+   * the document, which runs before the calendar's own React handler, so the calendar claims the key at the window first.
+   */
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        close();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
+  }, [open, close]);
+
   /** The calendar always opens on the month of the current value, or today's month. */
   const show = () => {
     window.clearTimeout(closeTimer.current);
@@ -295,12 +315,6 @@ export function DatePicker({
               className={styles.popover}
               role="dialog"
               aria-label={fill(labels.calendar, { label })}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.stopPropagation();
-                  close();
-                }
-              }}
               initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -8 }}
               animate={{
                 opacity: 1,
