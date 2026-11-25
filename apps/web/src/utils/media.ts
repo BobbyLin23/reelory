@@ -27,7 +27,7 @@ export const parseTmdbId = (value: string | undefined): number | null => {
 
 export const tmdbImageUrl = (
   path: string | null,
-  size: "w185" | "w500" | "w780" | "original",
+  size: "w185" | "w500" | "w780" | "w1280" | "original",
 ): string | null => (path === null ? null : `${TMDB_IMAGE}/${size}${path}`);
 
 export const yearFromDate = (value: string | null): number | null => {

@@ -5,24 +5,48 @@
   min-width: 0;
 }
 
-.intro {
+.intro,
+.introWithBackdrop {
   display: grid;
   gap: var(--space-6);
 }
 
-.hero {
+.introWithBackdrop {
+  --poster-lift: var(--space-20);
+
+  gap: var(--space-4);
+}
+
+/* The backdrop is a full-bleed, tall canvas that dissolves into the page; the poster
+   rises out of it instead of sitting under a letterboxed strip. */
+.canvas {
+  position: relative;
   overflow: hidden;
-  width: 100%;
-  height: clamp(7rem, 17vw, 12rem);
-  border-radius: var(--radius-surface);
+  width: 100cqw;
+  height: clamp(13rem, 34vw, 30rem);
+  margin-top: calc(var(--space-6) * -1);
+  margin-inline: calc(50% - 50cqw);
   background: var(--surface-muted);
 }
 
-.hero img {
+.backdrop {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: 50% 30%;
+}
+
+.canvas::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 64%, var(--background));
+  content: "";
+  pointer-events: none;
+}
+
+.introWithBackdrop .artwork {
+  translate: 0 calc(var(--poster-lift) * -1);
 }
 
 .withPoster,
@@ -51,6 +75,7 @@
   width: 100%;
   aspect-ratio: 2 / 3;
   overflow: hidden;
+  border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface-muted);
   object-fit: contain;
@@ -355,7 +380,17 @@
   }
 }
 
+@media (min-width: 768px) {
+  .canvas {
+    margin-top: calc(var(--space-10) * -1);
+  }
+}
+
 @media (min-width: 640px) {
+  .introWithBackdrop {
+    --poster-lift: calc(var(--space-16) * 2);
+  }
+
   .withPoster {
     grid-template-columns: 12rem minmax(0, 1fr);
     grid-template-areas: "art header" "art recording" "art synopsis";

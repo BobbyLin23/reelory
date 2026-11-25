@@ -105,7 +105,7 @@ const titleSnapshot = (
   movie: ReturnType<typeof useTitleQueries>["movie"],
   tv: ReturnType<typeof useTitleQueries>["tv"],
 ) => ({
-  backdropUrl: tmdbImageUrl(first(movie?.backdropPath, tv?.backdropPath, null), "w780"),
+  backdropUrl: tmdbImageUrl(first(movie?.backdropPath, tv?.backdropPath, null), "w1280"),
   creators: tv?.createdBy ?? [],
   overview: first(movie?.overview, tv?.overview, ""),
   posterPath: first(movie?.posterPath, tv?.posterPath, null),

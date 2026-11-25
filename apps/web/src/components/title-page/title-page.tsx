@@ -102,10 +102,10 @@ const TitleHero = ({
     .slice(0, POSTER_LIMIT);
 
   return (
-    <div className={styles.intro}>
+    <div className={backdropUrl === null ? styles.intro : styles.introWithBackdrop}>
       {backdropUrl === null ? null : (
-        <div className={styles.hero}>
-          <img alt="" src={backdropUrl} />
+        <div className={styles.canvas}>
+          <img alt="" className={styles.backdrop} src={backdropUrl} />
         </div>
       )}
       <div className={paths.length > 0 ? styles.withPoster : styles.withoutPoster}>
