@@ -12,7 +12,7 @@ import { useTheme } from "@/components/theme-provider";
 import styles from "./app-shell.module.css";
 
 const destinations = [
-  { to: "/", label: "Home", icon: House, end: true },
+  { to: "/", label: "Records", icon: House, end: true },
   { to: "/discover", label: "Discover", icon: Compass, end: false },
   { to: "/lists", label: "Lists", icon: ListVideo, end: false },
   { to: "/stats", label: "Stats", icon: ChartNoAxesColumn, end: false },

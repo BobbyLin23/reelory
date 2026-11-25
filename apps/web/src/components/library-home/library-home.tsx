@@ -132,7 +132,7 @@ const LibrarySearch = ({ entries }: { entries: LibraryItem[] | undefined }) => {
     : [];
   let message = "";
   if (entries?.length === 0) {
-    message = "Your library is empty. Use Add on Home to find a title to save.";
+    message = "Your library is empty. Use Add on Records to find a title to save.";
   } else if (term && matches.length === 0) {
     message = "No saved titles match. Try another title.";
   } else if (matches.length > 0) {
@@ -358,7 +358,7 @@ export const LibraryHome = () => {
     <header className={styles.pageHeader}>
       <PageIntro
         description="Your library of films and series, and what to watch next."
-        title="Home"
+        title="Records"
       />
       <div className={styles.pageActions}>
         <LibrarySearch entries={libraryQuery.data?.entries} />
