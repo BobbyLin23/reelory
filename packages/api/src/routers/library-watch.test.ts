@@ -33,13 +33,14 @@ let db: Context["db"];
 
 beforeAll(async () => {
   const d1 = await miniflare.getD1Database("DB");
-  const migration = await Bun.file(
-    new URL(
-      "../../../db/src/migrations/20261119121921_melodic_satana/migration.sql",
-      import.meta.url,
-    ),
-  ).text();
-  await d1.batch(migration.split("--> statement-breakpoint").map((sql) => d1.prepare(sql.trim())));
+  const migrations = ["20261119121921_melodic_satana", "20261125094326_quick_giant_man"].map(
+    (directory) =>
+      Bun.file(new URL(`../../../db/src/migrations/${directory}/migration.sql`, import.meta.url)),
+  );
+  const statements = (await Promise.all(migrations.map((migration) => migration.text()))).flatMap(
+    (sql) => sql.split("--> statement-breakpoint").map((statement) => statement.trim()),
+  );
+  await d1.batch(statements.map((sql) => d1.prepare(sql)));
   db = createDb(d1);
 });
 
@@ -163,7 +164,16 @@ test("summarizes counts, the latest watch, and the furthest episode per title", 
 test("logs rewatches independently and lets only the owner edit or delete a watch", async () => {
   const alice = rpc("watch-alice");
   const bob = rpc("watch-bob");
-  const fields = { ...tv, episode: 1, rating: 9, review: "Private", season: 0, watchedOn: null };
+  const fields = {
+    ...tv,
+    episode: 1,
+    rating: 9,
+    review: "Private",
+    season: 0,
+    tags: ["IMAX", "with friends"],
+    viewingMethod: "cinema" as const,
+    watchedOn: null,
+  };
   const libraryEntry = await alice.library.setStatus({ ...tv, snapshot, status: "watching" });
   const watch = await alice.watch.log(fields);
   const rewatch = await alice.watch.log({ ...fields, watchedOn: "2024-02-29" });
@@ -181,6 +191,8 @@ test("logs rewatches independently and lets only the owner edit or delete a watc
     rating: null,
     review: null,
     season: null,
+    tags: [],
+    viewingMethod: null,
     watchedOn: null,
   });
   const unauthorizedChanges = [watch.id, crypto.randomUUID()].flatMap((id) => [
@@ -198,6 +210,8 @@ test("logs rewatches independently and lets only the owner edit or delete a watc
       id: watch.id,
       rating: null,
       season: 1,
+      tags: [],
+      viewingMethod: null,
       watchedOn: "2026-11-19",
     }),
   ).toMatchObject({
@@ -205,6 +219,8 @@ test("logs rewatches independently and lets only the owner edit or delete a watc
     rating: null,
     review: "Private",
     season: 1,
+    tags: [],
+    viewingMethod: null,
     watchedOn: "2026-11-19",
   });
   expect(await alice.watch.delete({ id: watch.id })).toEqual({ id: watch.id });
@@ -300,6 +316,10 @@ test("rejects invalid status, watch dates, ratings, and inconsistent episode fie
     client.watch.log({ ...movie, rating: 11 }),
     client.watch.log({ ...movie, episode: 1, season: 0 }),
     client.watch.log({ ...tv, episode: 1 }),
+    // @ts-expect-error Exercise an unknown method at the RPC boundary.
+    client.watch.log({ ...movie, viewingMethod: "imax" }),
+    client.watch.log({ ...movie, tags: ["ok", ""] }),
+    client.watch.log({ ...movie, tags: Array.from({ length: 21 }, (_, i) => `tag-${i}`) }),
     client.watch.markThrough({ ...movie, episodes: [{ episode: 1, season: 1 }] }),
     client.watch.markThrough({ ...tv, episodes: [] }),
     client.watch.markThrough({ ...tv, episodes: [{ episode: 0, season: 1 }] }),
@@ -320,5 +340,58 @@ test("rejects invalid status, watch dates, ratings, and inconsistent episode fie
   ];
   for (const result of await Promise.allSettled(requests)) {
     expect(result).toMatchObject({ reason: { code: "BAD_REQUEST" }, status: "rejected" });
+  }
+});
+
+test("adds viewing method and tags without touching existing watches", async () => {
+  const legacy = new Miniflare(
+    convertV4MiniflareOptions({
+      d1Databases: ["DB"],
+      modules: true,
+      script: "export default {}",
+    }),
+  );
+  try {
+    const d1 = await legacy.getD1Database("DB");
+    const run = async (directory: string) => {
+      const sql = await Bun.file(
+        new URL(`../../../db/src/migrations/${directory}/migration.sql`, import.meta.url),
+      ).text();
+      await d1.batch(
+        sql.split("--> statement-breakpoint").map((statement) => d1.prepare(statement.trim())),
+      );
+    };
+    await run("20261119121921_melodic_satana");
+    await d1
+      .prepare(
+        "INSERT INTO watch_entries (created_at, id, media_type, rating, review, tmdb_id, user_id, watched_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      )
+      .bind(
+        1_700_000_000_000,
+        "legacy-watch",
+        "movie",
+        8,
+        "Legacy review",
+        42,
+        "legacy-user",
+        "2020-01-01",
+      )
+      .run();
+    await run("20261125094326_quick_giant_man");
+    const row = await d1
+      .prepare(
+        "SELECT rating, review, tags, viewing_method, watched_on FROM watch_entries WHERE id = ?",
+      )
+      .bind("legacy-watch")
+      .first();
+    expect(row).toMatchObject({
+      rating: 8,
+      review: "Legacy review",
+      tags: "[]",
+      viewing_method: null,
+      watched_on: "2020-01-01",
+    });
+  } finally {
+    await legacy.dispose();
   }
 });

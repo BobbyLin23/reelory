@@ -50,12 +50,14 @@ const isOpenSeason = (season: TmdbTvDetail["seasons"][number], progress: Episode
 const MarkThroughForm = ({
   onMarked,
   onOpenChange,
+  onTrack,
   progress,
   seasons,
   tmdbId,
 }: {
   onMarked: (marked: MarkedThrough) => void;
   onOpenChange: (open: boolean) => void;
+  onTrack: () => Promise<unknown>;
   progress: EpisodePosition | null;
   seasons: TmdbTvDetail["seasons"];
   tmdbId: number;
@@ -116,6 +118,7 @@ const MarkThroughForm = ({
         queryClient.invalidateQueries({ queryKey: orpc.library.overview.key() }),
         queryClient.invalidateQueries({ queryKey: orpc.watch.list.key() }),
       ]);
+      await onTrack();
       onMarked({ created: result.created, through: target });
       onOpenChange(false);
     } catch {
@@ -194,11 +197,13 @@ const MarkThroughForm = ({
 
 export const SeriesProgressSection = ({
   isPending,
+  onTrack,
   seasons,
   tmdbId,
   watches,
 }: {
   isPending: boolean;
+  onTrack: () => Promise<unknown>;
   seasons: TmdbTvDetail["seasons"];
   tmdbId: number;
   watches: WatchLog[];
@@ -234,6 +239,7 @@ export const SeriesProgressSection = ({
         queryClient.invalidateQueries({ queryKey: orpc.library.overview.key() }),
         queryClient.invalidateQueries({ queryKey: orpc.watch.list.key() }),
       ]);
+      await onTrack();
     } catch {
       // The alert below the actions reports the failure.
     }
@@ -306,6 +312,7 @@ export const SeriesProgressSection = ({
               tmdbId={tmdbId}
               onMarked={setMarked}
               onOpenChange={setThroughOpen}
+              onTrack={onTrack}
             />
           ) : null}
         </DialogContent>

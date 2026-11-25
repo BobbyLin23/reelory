@@ -1,3 +1,4 @@
+import { Check, FolderPlus } from "lucide-react";
 import { useState } from "react";
 
 import { Alert } from "@/components/arc/alert/alert";
@@ -5,12 +6,11 @@ import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { Carousel } from "@/components/arc/carousel/carousel";
 import { ExpandableText } from "@/components/arc/expandable-text/expandable-text";
-import { Select } from "@/components/arc/select/select";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { AddToListDialog } from "@/components/lists/add-to-list-dialog";
 import { useI18n } from "@/i18n/i18n";
 import type { LibraryStatus } from "@/utils/media";
-import { LIBRARY_STATUSES, formatVote, libraryStatusLabel, tmdbImageUrl } from "@/utils/media";
+import { formatVote, tmdbImageUrl } from "@/utils/media";
 
 import { LogSheet } from "./log-sheet";
 import { SeriesProgressSection } from "./series-progress-section";
@@ -77,7 +77,7 @@ const TitleHero = ({
   libraryStatus,
   onAddToList,
   onLog,
-  onStatus,
+  onWant,
   overview,
   pendingStatus,
   posterPath,
@@ -93,7 +93,7 @@ const TitleHero = ({
   libraryStatus: LibraryStatus | undefined;
   onAddToList: () => void;
   onLog: () => void;
-  onStatus: (status: LibraryStatus) => void;
+  onWant: () => void;
   overview: string;
   pendingStatus: LibraryStatus | null;
   posterPath: string | null;
@@ -108,10 +108,7 @@ const TitleHero = ({
   const paths = [...new Set([posterPath, ...(posters ?? []).map(({ filePath }) => filePath)])]
     .filter((path): path is string => !!path)
     .slice(0, POSTER_LIMIT);
-  const statusOptions = LIBRARY_STATUSES.map((status) => ({
-    label: libraryStatusLabel(status, locale),
-    value: status,
-  }));
+  const wantSaved = libraryStatus === "want";
 
   return (
     <div className={backdropUrl === null ? styles.intro : styles.introWithBackdrop}>
@@ -146,30 +143,40 @@ const TitleHero = ({
         <div className={styles.recording}>
           <div className={styles.actions}>
             <Button size="lg" type="button" onClick={onLog}>
-              {t("title.logWatch")}
+              {t("title.watched")}
             </Button>
-            <Button size="lg" type="button" variant="secondary" onClick={onAddToList}>
-              {t("title.addToList")}
+            <Button
+              aria-pressed={wantSaved}
+              disabled={wantSaved || pendingStatus !== null}
+              loading={pendingStatus === "want" && !wantSaved}
+              size="lg"
+              type="button"
+              variant="secondary"
+              onClick={onWant}
+            >
+              {wantSaved ? (
+                <>
+                  <Check aria-hidden="true" size={16} strokeWidth={1.75} />
+                  {t("title.inWantList")}
+                </>
+              ) : (
+                t("title.wantToWatch")
+              )}
+            </Button>
+            <Button
+              aria-label={t("title.addToList")}
+              size="lg"
+              title={t("title.addToList")}
+              type="button"
+              variant="secondary"
+              onClick={onAddToList}
+            >
+              <FolderPlus aria-hidden="true" size={18} strokeWidth={1.75} />
             </Button>
           </div>
-          <div className={styles.status}>
-            <Select
-              className={styles.statusTrigger}
-              label={t("title.statusLabel")}
-              options={statusOptions}
-              placeholder={t("title.notSet")}
-              value={libraryStatus ?? ""}
-              onValueChange={(value) => {
-                const choice = LIBRARY_STATUSES.find((status) => status === value);
-                if (choice && pendingStatus === null && choice !== libraryStatus) {
-                  onStatus(choice);
-                }
-              }}
-            />
-            <span className="sr-only" role="status">
-              {pendingStatus === null ? "" : t("title.savingStatus")}
-            </span>
-          </div>
+          <span className="sr-only" role="status">
+            {pendingStatus === null ? "" : t("title.savingStatus")}
+          </span>
           {statusError === null ? null : (
             <p className={styles.error} role="alert">
               {statusError}
@@ -264,7 +271,7 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
             page.setEditingId(null);
             page.setLogOpen(true);
           }}
-          onStatus={page.handleSaveStatus}
+          onWant={() => page.handleSaveStatus("want")}
         />
       )}
       {page.isTv ? (
@@ -273,6 +280,7 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
           seasons={page.seasons}
           tmdbId={tmdbId}
           watches={page.watches}
+          onTrack={page.handleEpisodeLogged}
         />
       ) : null}
       <CrewSection creators={page.creators} credits={page.credits} isTv={page.isTv} />
@@ -301,6 +309,7 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
         seasons={page.seasons}
         title={page.title}
         tmdbId={tmdbId}
+        onSaved={page.handleLogged}
         onOpenChange={(open) => {
           page.setLogOpen(open);
           if (!open) {

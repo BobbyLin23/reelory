@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/locale";
+import type { MessageKey } from "@/i18n/messages";
 import { translate } from "@/i18n/messages";
 
 const POSTER_PATH = /^\/[\w-]+\.[a-zA-Z0-9]+$/u;
@@ -8,6 +9,20 @@ const TMDB_IMAGE = "https://image.tmdb.org/t/p";
 export type MediaType = "movie" | "tv";
 export const LIBRARY_STATUSES = ["want", "watching", "watched"] as const;
 export type LibraryStatus = (typeof LIBRARY_STATUSES)[number];
+
+export const VIEWING_METHODS = ["cinema", "streaming", "tv", "physical", "other"] as const;
+export type ViewingMethod = (typeof VIEWING_METHODS)[number];
+
+const VIEWING_METHOD_KEYS = {
+  cinema: "log.viewingMethodCinema",
+  other: "log.viewingMethodOther",
+  physical: "log.viewingMethodPhysical",
+  streaming: "log.viewingMethodStreaming",
+  tv: "log.viewingMethodTv",
+} as const satisfies Record<ViewingMethod, MessageKey>;
+
+export const viewingMethodLabel = (method: ViewingMethod, locale: Locale): string =>
+  translate(locale, VIEWING_METHOD_KEYS[method]);
 
 export const libraryStatusLabel = (status: LibraryStatus, locale: Locale): string =>
   translate(locale, `status.${status}`);

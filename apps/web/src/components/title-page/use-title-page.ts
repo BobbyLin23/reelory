@@ -136,6 +136,19 @@ export const useTitlePage = (mediaType: "movie" | "tv", tmdbId: number) => {
     year: snapshot.year,
   });
 
+  // A logged movie is watched. A whole-series watch also finishes a series,
+  // while an episode keeps it watching, so recording an episode always puts the
+  // series in the library and the whole-series choice still moves it out.
+  const handleLogged = (watch: { season: number | null }) =>
+    actions.handleSaveStatus(queries.isTv && watch.season !== null ? "watching" : "watched");
+  // The quick episode actions skip the form, so they add a series to Watching
+  // when it is new or still queued and otherwise leave the status alone.
+  const handleEpisodeLogged = async () => {
+    if (queries.libraryStatus === undefined || queries.libraryStatus === "want") {
+      await actions.handleSaveStatus("watching");
+    }
+  };
+
   return {
     credits: queries.credits,
     creditsPending: queries.creditsPending,
@@ -145,6 +158,8 @@ export const useTitlePage = (mediaType: "movie" | "tv", tmdbId: number) => {
     editingId,
     genres: queries.genres,
     handleDeleteLog: actions.handleDeleteLog,
+    handleEpisodeLogged,
+    handleLogged,
     handleRetryDetail: queries.refetchDetail,
     handleSaveStatus: actions.handleSaveStatus,
     isTv: queries.isTv,

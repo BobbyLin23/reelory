@@ -1,16 +1,22 @@
 import { ORPCError } from "@orpc/server";
-import { watchEntries } from "@reelory/db/schema";
+import { VIEWING_METHODS, watchEntries } from "@reelory/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import { titleKey } from "./title-key";
 
+const MAX_TAGS = 20;
+
+const tag = z.string().trim().min(1).max(50);
+
 const watchFields = z.object({
   episode: z.int().positive().nullish(),
   rating: z.int().min(1).max(10).nullish(),
   review: z.string().max(10_000).nullish(),
   season: z.int().nonnegative().nullish(),
+  tags: z.array(tag).max(MAX_TAGS).nullish(),
+  viewingMethod: z.enum(VIEWING_METHODS).nullish(),
   watchedOn: z.iso.date().nullish(),
 });
 
@@ -69,7 +75,11 @@ export const watchRouter = {
     .handler(({ context, input }) =>
       context.db
         .insert(watchEntries)
-        .values({ ...input, userId: context.auth.userId })
+        .values({
+          ...input,
+          tags: input.tags ?? [],
+          userId: context.auth.userId,
+        })
         .returning()
         .get(),
     ),
@@ -129,8 +139,8 @@ export const watchRouter = {
               episode,
               mediaType: input.mediaType,
               season,
-              userId: context.auth.userId,
               tmdbId: input.tmdbId,
+              userId: context.auth.userId,
               watchedOn: input.watchedOn ?? null,
             })),
           )
@@ -154,12 +164,16 @@ export const watchRouter = {
           },
         )
         .refine(
-          ({ episode, rating, review, season, watchedOn }) =>
-            [episode, rating, review, season, watchedOn].some((value) => value !== undefined),
+          ({ episode, rating, review, season, tags, viewingMethod, watchedOn }) =>
+            [episode, rating, review, season, tags, viewingMethod, watchedOn].some(
+              (value) => value !== undefined,
+            ),
           { message: "Provide at least one field to update." },
         ),
     )
-    .handler(async ({ context, input: { id, ...changes } }) => {
+    .handler(async ({ context, input: { id, ...rest } }) => {
+      const { tags, ...changes } = rest;
+      const values = tags === undefined ? changes : { ...changes, tags: tags ?? [] };
       const where = ownedWatch(id, context.auth.userId);
       if (typeof changes.season === "number") {
         const row = await context.db
@@ -178,7 +192,7 @@ export const watchRouter = {
       }
       const updated = await context.db
         .update(watchEntries)
-        .set(changes)
+        .set(values)
         .where(where)
         .returning()
         .get();

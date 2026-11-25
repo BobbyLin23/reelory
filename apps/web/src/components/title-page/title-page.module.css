@@ -156,22 +156,8 @@
 }
 
 .recording {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-4) var(--space-6);
-}
-
-.status {
-  width: min(100%, 10rem);
-}
-
-.statusTrigger {
-  --control-height-md: 2.75rem;
-}
-
-.recording .error {
-  flex-basis: 100%;
+  display: grid;
+  gap: var(--space-3);
 }
 
 .section,
@@ -342,6 +328,15 @@
   color: var(--text-secondary);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .form {

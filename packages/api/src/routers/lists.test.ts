@@ -38,6 +38,7 @@ beforeAll(async () => {
   const migrations = [
     "../../../db/src/migrations/20261119121921_melodic_satana/migration.sql",
     "../../../db/src/migrations/20261120070619_regular_post/migration.sql",
+    "../../../db/src/migrations/20261125094326_quick_giant_man/migration.sql",
   ];
   const loaded = await Promise.all(
     migrations.map(async (path) => {

@@ -5,9 +5,13 @@ export const MEDIA_TYPES = ["movie", "tv"] as const;
 
 export const LIBRARY_STATUSES = ["want", "watching", "watched"] as const;
 
+export const VIEWING_METHODS = ["cinema", "streaming", "tv", "physical", "other"] as const;
+
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
 export type LibraryStatus = (typeof LIBRARY_STATUSES)[number];
+
+export type ViewingMethod = (typeof VIEWING_METHODS)[number];
 
 // One row per title a user has saved. Title metadata is snapshotted at save
 // time (D7) so the library, lists, and stats render without calling TMDB.
@@ -48,6 +52,8 @@ export const libraryEntries = sqliteTable(
 // episode of a series carries its own date. `watched_on` is a calendar date
 // (YYYY-MM-DD) so stats group by day, and optional so old watches can be
 // logged without inventing one. `rating` is 1-10, rendered as half stars.
+// `viewing_method` and `tags` are the newer details; both columns are optional
+// or empty on rows logged before they existed, so old watches stay valid.
 export const watchEntries = sqliteTable(
   "watch_entries",
   {
@@ -62,8 +68,10 @@ export const watchEntries = sqliteTable(
     rating: integer("rating"),
     review: text("review"),
     season: integer("season"),
+    tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
     tmdbId: integer("tmdb_id").notNull(),
     userId: text("user_id").notNull(),
+    viewingMethod: text("viewing_method", { enum: VIEWING_METHODS }),
     watchedOn: text("watched_on"),
   },
   (table) => [

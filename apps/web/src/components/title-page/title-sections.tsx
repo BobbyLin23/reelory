@@ -1,13 +1,21 @@
 import type { TmdbCredits, TmdbTvDetail } from "@reelory/api/tmdb/schemas";
 
 import { Avatar } from "@/components/arc/avatar/avatar";
+import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Rating } from "@/components/arc/rating/rating";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import { useI18n } from "@/i18n/i18n";
 import type { MessageKey } from "@/i18n/messages";
-import { formatWatchDate, ratingToStars, tmdbImageUrl, yearFromDate } from "@/utils/media";
+import type { ViewingMethod } from "@/utils/media";
+import {
+  formatWatchDate,
+  ratingToStars,
+  tmdbImageUrl,
+  viewingMethodLabel,
+  yearFromDate,
+} from "@/utils/media";
 
 import styles from "./title-page.module.css";
 
@@ -24,6 +32,8 @@ export interface WatchLog {
   rating: number | null;
   review: string | null;
   season: number | null;
+  tags: string[];
+  viewingMethod: ViewingMethod | null;
   watchedOn: string | null;
 }
 
@@ -171,56 +181,76 @@ export const WatchesSection = ({
           <p className={styles.overview}>{t("title.noWatches")}</p>
         ) : (
           <ul className={styles.logs}>
-            {watches.map((watch) => (
-              <li className={styles.log} key={watch.id}>
-                <div className={styles.logHeader}>
-                  <div className={styles.logMeta}>
-                    <p className={styles.logDate}>
-                      {formatWatchDate(watch.watchedOn, locale) ?? t("common.unknownDate")}
-                    </p>
-                    {watch.season === null || watch.episode === null ? null : (
-                      <p className={styles.logEpisode}>
-                        {t("title.seasonEpisode", {
-                          episode: watch.episode,
-                          season: watch.season,
-                        })}
+            {watches.map((watch) => {
+              const episode =
+                watch.season === null || watch.episode === null
+                  ? null
+                  : t("title.seasonEpisode", {
+                      episode: watch.episode,
+                      season: watch.season,
+                    });
+              const method =
+                watch.viewingMethod === null
+                  ? null
+                  : viewingMethodLabel(watch.viewingMethod, locale);
+              const details = [episode, method].filter((detail) => detail !== null);
+              return (
+                <li className={styles.log} key={watch.id}>
+                  <div className={styles.logHeader}>
+                    <div className={styles.logMeta}>
+                      <p className={styles.logDate}>
+                        {formatWatchDate(watch.watchedOn, locale) ?? t("common.unknownDate")}
                       </p>
-                    )}
-                    {watch.rating === null ? null : (
-                      <Rating
-                        allowHalf
-                        formatSpokenValue={(value, max) => t("arc.rating.spoken", { max, value })}
-                        formatValue={(value, max) => t("arc.rating.value", { max, value })}
-                        label={t("title.yourRating")}
-                        max={5}
-                        readOnly
-                        showValue
-                        value={ratingToStars(watch.rating)}
+                      {details.length === 0 ? null : (
+                        <p className={styles.logEpisode}>{details.join(" · ")}</p>
+                      )}
+                      {watch.rating === null ? null : (
+                        <Rating
+                          allowHalf
+                          formatSpokenValue={(value, max) => t("arc.rating.spoken", { max, value })}
+                          formatValue={(value, max) => t("arc.rating.value", { max, value })}
+                          label={t("title.yourRating")}
+                          max={5}
+                          readOnly
+                          showValue
+                          value={ratingToStars(watch.rating)}
+                        />
+                      )}
+                    </div>
+                    <div className={styles.logActions}>
+                      <Button type="button" variant="secondary" onClick={() => onEdit(watch.id)}>
+                        {t("title.editWatch")}
+                      </Button>
+                      <ConfirmMorph
+                        cancelLabel={t("common.cancel")}
+                        confirmLabel={t("common.delete")}
+                        doneLabel={t("common.deleted")}
+                        errorLabel={t("common.errorLabel")}
+                        label={t("common.delete")}
+                        pendingLabel={t("common.deleting")}
+                        prompt={t("title.deleteWatchPrompt")}
+                        retryLabel={t("common.tryAgain")}
+                        onConfirm={() => onDelete(watch.id)}
                       />
-                    )}
+                    </div>
                   </div>
-                  <div className={styles.logActions}>
-                    <Button type="button" variant="secondary" onClick={() => onEdit(watch.id)}>
-                      {t("title.editWatch")}
-                    </Button>
-                    <ConfirmMorph
-                      cancelLabel={t("common.cancel")}
-                      confirmLabel={t("common.delete")}
-                      doneLabel={t("common.deleted")}
-                      errorLabel={t("common.errorLabel")}
-                      label={t("common.delete")}
-                      pendingLabel={t("common.deleting")}
-                      prompt={t("title.deleteWatchPrompt")}
-                      retryLabel={t("common.tryAgain")}
-                      onConfirm={() => onDelete(watch.id)}
-                    />
-                  </div>
-                </div>
-                {watch.review === null || watch.review === "" ? null : (
-                  <p className={styles.review}>{watch.review}</p>
-                )}
-              </li>
-            ))}
+                  {watch.review === null || watch.review === "" ? null : (
+                    <p className={styles.review}>{watch.review}</p>
+                  )}
+                  {watch.tags.length === 0 ? null : (
+                    <ul aria-label={t("log.tagsLabel")} className={styles.tags}>
+                      {watch.tags.map((tag) => (
+                        <li key={tag}>
+                          <Badge pill size="sm">
+                            {tag}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Skeleton>
