@@ -7,6 +7,7 @@ import { Link, NavLink, useNavigate } from "react-router";
 import { Button } from "@/components/arc/button/button";
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
 import { UserMenu } from "@/components/arc/user-menu/user-menu";
+import { BrandLockup } from "@/components/brand-lockup";
 import { useTheme } from "@/components/theme-provider";
 
 import styles from "./app-shell.module.css";
@@ -116,8 +117,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         Skip to content
       </a>
       <header className={styles.topBar}>
-        <Link className={styles.brand} to="/">
-          reelory
+        <Link aria-label="Reelory home" className={styles.brand} to="/">
+          <BrandLockup />
         </Link>
         <AccountControls />
       </header>

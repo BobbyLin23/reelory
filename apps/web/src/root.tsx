@@ -41,6 +41,8 @@ function ClerkApiAuthBridge() {
 }
 
 export const links: Route.LinksFunction = () => [
+  { href: "/favicon.svg", rel: "icon", type: "image/svg+xml" },
+  { href: "/favicon.ico", rel: "icon", sizes: "any" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {

@@ -1,4 +1,5 @@
 import { ThemeSwitch } from "@/components/arc/theme-switch/theme-switch";
+import { BrandLockup } from "@/components/brand-lockup";
 import { useTheme } from "@/components/theme-provider";
 import styles from "@/components/auth-page.module.css";
 
@@ -17,7 +18,7 @@ export const AuthPage = ({ title, description, children }: AuthPageProps) => {
   return (
     <main className={styles.page}>
       <header className={styles.bar}>
-        <span className={styles.brand}>reelory</span>
+        <BrandLockup />
         <ThemeSwitch
           iconOnly
           theme={resolvedTheme === "light" ? "light" : "dark"}

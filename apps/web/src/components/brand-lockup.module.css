@@ -1,0 +1,19 @@
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.mark {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+}
+
+.word {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: var(--tracking-display);
+  line-height: 1;
+}

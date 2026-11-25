@@ -42,13 +42,10 @@
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
   border-radius: var(--radius-control);
   color: var(--foreground);
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 500;
-  letter-spacing: var(--tracking-display);
-  line-height: 1;
   text-decoration: none;
 }
 
