@@ -17,15 +17,11 @@
   gap: var(--space-4);
 }
 
-/* The backdrop is a full-bleed, tall canvas that dissolves into the page; the poster
-   rises out of it instead of sitting under a letterboxed strip. */
+/* Clipping and surface for the full-bleed backdrop; its size and bleed live in
+   index.css so they paint before any route stylesheet arrives. */
 .canvas {
   position: relative;
   overflow: hidden;
-  width: 100cqw;
-  height: clamp(13rem, 34vw, 30rem);
-  margin-top: calc(var(--space-6) * -1);
-  margin-inline: calc(50% - 50cqw);
   background: var(--surface-muted);
 }
 
@@ -46,6 +42,21 @@
 }
 
 .introWithBackdrop .artwork {
+  translate: 0 calc(var(--poster-lift) * -1);
+}
+
+.heroSkeleton {
+  display: grid;
+  grid-template-columns: minmax(9.75rem, 0.8fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.posterSkeleton {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
   translate: 0 calc(var(--poster-lift) * -1);
 }
 
@@ -397,15 +408,13 @@
   }
 }
 
-@media (min-width: 768px) {
-  .canvas {
-    margin-top: calc(var(--space-10) * -1);
-  }
-}
-
 @media (min-width: 640px) {
   .introWithBackdrop {
     --poster-lift: calc(var(--space-16) * 2);
+  }
+
+  .heroSkeleton {
+    grid-template-columns: 12rem minmax(0, 1fr);
   }
 
   .withPoster {

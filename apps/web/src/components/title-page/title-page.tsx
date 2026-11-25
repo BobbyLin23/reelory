@@ -116,7 +116,7 @@ const TitleHero = ({
   return (
     <div className={backdropUrl === null ? styles.intro : styles.introWithBackdrop}>
       {backdropUrl === null ? null : (
-        <div className={styles.canvas}>
+        <div className={styles.canvas} data-title-canvas>
           <img alt="" className={styles.backdrop} src={backdropUrl} />
         </div>
       )}
@@ -196,6 +196,20 @@ const TitleHero = ({
   );
 };
 
+const TitleHeroFallback = () => {
+  const { t } = useI18n();
+
+  return (
+    <div className={styles.introWithBackdrop}>
+      <div className={styles.canvas} data-title-canvas />
+      <div className={styles.heroSkeleton}>
+        <div className={styles.posterSkeleton} />
+        <Skeleton label={t("title.loading")} lines={5} />
+      </div>
+    </div>
+  );
+};
+
 const TitleError = ({ error, onRetry }: { error: unknown; onRetry: () => Promise<unknown> }) => {
   const { t } = useI18n();
 
@@ -216,7 +230,6 @@ const TitleError = ({ error, onRetry }: { error: unknown; onRetry: () => Promise
 };
 
 export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
-  const { t } = useI18n();
   const page = useTitlePage(mediaType, tmdbId);
   const [listOpen, setListOpen] = useState(false);
 
@@ -226,32 +239,34 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
 
   return (
     <div className={styles.page}>
-      <Skeleton label={t("title.loading")} lines={6} loading={page.detailPending}>
-        {page.title === "" ? null : (
-          <TitleHero
-            backdropUrl={page.backdropUrl}
-            genres={page.genres}
-            libraryStatus={page.libraryStatus}
-            overview={page.overview}
-            pendingStatus={page.pendingStatus}
-            posterPath={page.posterPath}
-            posters={page.posters}
-            runtimeLabel={page.runtimeLabel}
-            statusError={page.statusError}
-            title={page.title}
-            voteAverage={page.voteAverage}
-            year={page.year}
-            onAddToList={() => {
-              setListOpen(true);
-            }}
-            onLog={() => {
-              page.setEditingId(null);
-              page.setLogOpen(true);
-            }}
-            onStatus={page.handleSaveStatus}
-          />
-        )}
-      </Skeleton>
+      {page.title === "" ? (
+        page.detailPending ? (
+          <TitleHeroFallback />
+        ) : null
+      ) : (
+        <TitleHero
+          backdropUrl={page.backdropUrl}
+          genres={page.genres}
+          libraryStatus={page.libraryStatus}
+          overview={page.overview}
+          pendingStatus={page.pendingStatus}
+          posterPath={page.posterPath}
+          posters={page.posters}
+          runtimeLabel={page.runtimeLabel}
+          statusError={page.statusError}
+          title={page.title}
+          voteAverage={page.voteAverage}
+          year={page.year}
+          onAddToList={() => {
+            setListOpen(true);
+          }}
+          onLog={() => {
+            page.setEditingId(null);
+            page.setLogOpen(true);
+          }}
+          onStatus={page.handleSaveStatus}
+        />
+      )}
       {page.isTv ? (
         <SeriesProgressSection
           isPending={page.detailPending || page.watchesPending}

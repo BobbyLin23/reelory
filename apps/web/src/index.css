@@ -12,3 +12,22 @@
     display: none;
   }
 }
+
+/* The title hero bleeds to the edge of the content pane beside the nav rail. Its
+   geometry lives in this first-paint sheet so a route stylesheet that arrives
+   later can never inset the artwork for a frame. */
+main [data-title-canvas] {
+  width: 100vw;
+  height: clamp(13rem, 34vw, 30rem);
+  margin-top: calc(var(--space-6) * -1);
+  margin-inline: calc(50% - 50vw);
+  border-radius: 0;
+}
+
+@media (min-width: 768px) {
+  main [data-title-canvas] {
+    width: calc(100vw - 14.5rem);
+    margin-top: calc(var(--space-10) * -1);
+    margin-inline: calc(50% - 50vw + 7.25rem);
+  }
+}
