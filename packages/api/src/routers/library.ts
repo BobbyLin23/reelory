@@ -155,6 +155,24 @@ export const libraryRouter = {
         ),
     ),
 
+  // Removing from Want only clears a row that is still queued. If the title moved
+  // to Watching or Watched after the confirmation opened, the newer status wins.
+  removeWant: protectedProcedure.input(titleKey).handler(async ({ context, input }) => {
+    const removed = await context.db
+      .delete(libraryEntries)
+      .where(
+        and(
+          eq(libraryEntries.userId, context.auth.userId),
+          eq(libraryEntries.mediaType, input.mediaType),
+          eq(libraryEntries.tmdbId, input.tmdbId),
+          eq(libraryEntries.status, "want"),
+        ),
+      )
+      .returning({ id: libraryEntries.id })
+      .get();
+    return { removed: removed !== undefined };
+  }),
+
   setStatus: protectedProcedure
     .input(titleKey.extend({ snapshot, status }))
     .handler(({ context, input }) => {

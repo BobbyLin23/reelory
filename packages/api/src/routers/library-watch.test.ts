@@ -70,6 +70,7 @@ test("rejects unauthenticated requests to every new procedure", async () => {
   const requests = [
     anonymous.library.list(),
     anonymous.library.overview(),
+    anonymous.library.removeWant(tv),
     anonymous.library.setStatus({ ...tv, snapshot, status: "watching" }),
     anonymous.watch.list(tv),
     anonymous.watch.log(tv),
@@ -105,6 +106,44 @@ test("upserts one localized library snapshot per user and title, then filters an
   expect(await alice.library.list({ status: "watching" })).toHaveLength(2);
   expect(await bob.library.list()).toEqual([otherUser]);
   expect(updated).toMatchObject(snapshot);
+});
+
+test("removes only the caller's Want entry, sparing watches, lists, and newer statuses", async () => {
+  const alice = rpc("remove-want-alice");
+  const bob = rpc("remove-want-bob");
+  const series = { mediaType: "tv", tmdbId: 404 } as const;
+
+  const want = await alice.library.setStatus({ ...series, snapshot, status: "want" });
+  const bobWant = await bob.library.setStatus({ ...series, snapshot, status: "want" });
+  const watch = await alice.watch.log({ ...series, episode: 1, season: 1 });
+  const list = await alice.lists.create({ name: "Private" });
+  await alice.lists.addItem({ ...series, listId: list.id });
+
+  expect(want).toMatchObject({ status: "want" });
+  expect(await alice.library.removeWant(series)).toEqual({ removed: true });
+  expect(await alice.library.list(series)).toEqual([]);
+  expect(await alice.watch.list(series)).toEqual([watch]);
+  expect(
+    (await alice.lists.get({ id: list.id })).items.map(({ mediaType, tmdbId }) => ({
+      mediaType,
+      tmdbId,
+    })),
+  ).toEqual([series]);
+  // Another user's identical Want entry belongs to them and stays put.
+  expect(await bob.library.list(series)).toEqual([bobWant]);
+
+  // A status changed after the dialog opened is newer than the Want entry the confirm described.
+  const watched = await alice.library.setStatus({ ...series, snapshot, status: "watched" });
+  expect(await alice.library.removeWant(series)).toEqual({ removed: false });
+  expect(await alice.library.list(series)).toEqual([watched]);
+
+  // Asking twice, or after the entry is gone, is harmless.
+  expect(await alice.library.setStatus({ ...series, snapshot, status: "want" })).toMatchObject({
+    status: "want",
+  });
+  await alice.library.removeWant(series);
+  expect(await alice.library.removeWant(series)).toEqual({ removed: false });
+  expect(await alice.library.list(series)).toEqual([]);
 });
 
 test("summarizes counts, the latest watch, and the furthest episode per title", async () => {

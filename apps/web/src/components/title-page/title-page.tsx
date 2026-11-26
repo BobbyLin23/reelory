@@ -13,6 +13,7 @@ import type { LibraryStatus } from "@/utils/media";
 import { formatVote, tmdbImageUrl } from "@/utils/media";
 
 import { LogSheet } from "./log-sheet";
+import { RemoveWantDialog } from "./remove-want-dialog";
 import { SeriesProgressSection } from "./series-progress-section";
 import { CastSection, CrewSection, SeasonsSection, WatchesSection } from "./title-sections";
 import { errorCode, useTitlePage } from "./use-title-page";
@@ -77,6 +78,7 @@ const TitleHero = ({
   libraryStatus,
   onAddToList,
   onLog,
+  onRemoveWant,
   onWant,
   overview,
   pendingStatus,
@@ -93,6 +95,7 @@ const TitleHero = ({
   libraryStatus: LibraryStatus | undefined;
   onAddToList: () => void;
   onLog: () => void;
+  onRemoveWant: () => void;
   onWant: () => void;
   overview: string;
   pendingStatus: LibraryStatus | null;
@@ -146,13 +149,14 @@ const TitleHero = ({
               {t("title.watched")}
             </Button>
             <Button
+              aria-haspopup={wantSaved ? "dialog" : undefined}
               aria-pressed={wantSaved}
-              disabled={wantSaved || pendingStatus !== null}
+              disabled={pendingStatus !== null}
               loading={pendingStatus === "want" && !wantSaved}
               size="lg"
               type="button"
               variant="secondary"
-              onClick={onWant}
+              onClick={wantSaved ? onRemoveWant : onWant}
             >
               {wantSaved ? (
                 <>
@@ -239,6 +243,7 @@ const TitleError = ({ error, onRetry }: { error: unknown; onRetry: () => Promise
 export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
   const page = useTitlePage(mediaType, tmdbId);
   const [listOpen, setListOpen] = useState(false);
+  const [removeWantOpen, setRemoveWantOpen] = useState(false);
 
   if (page.detailError) {
     return <TitleError error={page.detailError} onRetry={page.handleRetryDetail} />;
@@ -271,6 +276,7 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
             page.setEditingId(null);
             page.setLogOpen(true);
           }}
+          onRemoveWant={() => setRemoveWantOpen(true)}
           onWant={() => page.handleSaveStatus("want")}
         />
       )}
@@ -300,6 +306,13 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
         open={listOpen}
         tmdbId={tmdbId}
         onOpenChange={setListOpen}
+      />
+      <RemoveWantDialog
+        mediaType={mediaType}
+        open={removeWantOpen}
+        title={page.title}
+        tmdbId={tmdbId}
+        onOpenChange={setRemoveWantOpen}
       />
       <LogSheet
         entry={page.editing}

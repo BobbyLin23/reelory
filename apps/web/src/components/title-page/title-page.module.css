@@ -344,6 +344,22 @@
   gap: var(--space-4);
 }
 
+.dialogBody {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* The sheet has more height than the confirmation needs, so its actions sit at the bottom within thumb reach. */
+.sheetBody {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.sheetActions {
+  margin-top: auto;
+}
+
 /* The dialog body scrolls, so an anchored calendar is cut off at the card edge; in the form flow it keeps its footer and sits clear of the actions. The date calendar is the form's only nested dialog. */
 .form [role="dialog"] {
   position: static;

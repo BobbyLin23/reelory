@@ -381,6 +381,12 @@ const en = {
   "title.posterPosition": "Poster {position} of {count}",
   "title.postersLabel": "{title} posters",
   "title.producedBy": "Produced by",
+  "title.removeWantConfirm": "Remove from Want",
+  "title.removeWantDescription":
+    "“{title}” leaves your Want list. Your watch history and private lists stay as they are.",
+  "title.removeWantError":
+    "We could not remove this title from Want. Check your connection and try again.",
+  "title.removeWantTitle": "Remove from Want?",
   "title.savingStatus": "Saving library status",
   "title.seasonEpisode": "Season {season}, episode {episode}",
   "title.seasons": "Seasons",
@@ -754,6 +760,10 @@ const zh: Record<MessageKey, Message> = {
   "title.posterPosition": "第 {position} 张海报，共 {count} 张",
   "title.postersLabel": "{title}的海报",
   "title.producedBy": "制片",
+  "title.removeWantConfirm": "从想看中移除",
+  "title.removeWantDescription": "“{title}”将从想看列表中移除，观看记录和私密片单不受影响。",
+  "title.removeWantError": "无法将该作品从想看中移除，请检查网络连接后重试。",
+  "title.removeWantTitle": "从想看中移除？",
   "title.savingStatus": "正在保存收藏状态",
   "title.seasonEpisode": "第{season}季第{episode}集",
   "title.seasons": "季",
