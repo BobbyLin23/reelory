@@ -82,6 +82,7 @@ test("rejects unauthenticated requests to every list procedure", async () => {
     anonymous.lists.delete({ id }),
     anonymous.lists.addItem({ ...tv, listId: id }),
     anonymous.lists.removeItem({ ...tv, listId: id }),
+    anonymous.lists.reorder({ id, itemIds: [crypto.randomUUID()] }),
     anonymous.lists.forTitle(tv),
   ];
   for (const result of await Promise.allSettled(requests)) {
@@ -177,6 +178,84 @@ test("keeps insertion order and never adds the same title twice", async () => {
   expect(await alice.lists.removeItem({ ...first, listId: list.id })).toEqual({ removed: false });
   const remaining = await alice.lists.get({ id: list.id });
   expect(remaining.items.map(({ tmdbId }) => tmdbId)).toEqual([3, 2, 4, 5, 6, 7, 8]);
+});
+
+test("reorders a list, keeps it after reload, and shows the new order in the preview", async () => {
+  const alice = rpc("lists-reorder");
+  const list = await alice.lists.create({ name: "Ranked" });
+  await alice.lists.addItem({ listId: list.id, mediaType: "movie", tmdbId: 1 });
+  await alice.lists.addItem({ listId: list.id, mediaType: "movie", tmdbId: 2 });
+  await alice.lists.addItem({ listId: list.id, mediaType: "movie", tmdbId: 3 });
+  await alice.lists.addItem({ listId: list.id, mediaType: "movie", tmdbId: 4 });
+  await alice.lists.addItem({ listId: list.id, mediaType: "movie", tmdbId: 5 });
+  const before = await alice.lists.get({ id: list.id });
+  expect(before.items.map(({ tmdbId }) => tmdbId)).toEqual([1, 2, 3, 4, 5]);
+
+  const reversed = before.items.map(({ id }) => id).toReversed();
+  expect(await alice.lists.reorder({ id: list.id, itemIds: reversed })).toEqual({ reordered: 5 });
+
+  // A second read is a new request, so this is the saved order rather than client state.
+  const after = await alice.lists.get({ id: list.id });
+  expect(after.items.map(({ id }) => id)).toEqual(reversed);
+  expect(after.items.map(({ tmdbId }) => tmdbId)).toEqual([5, 4, 3, 2, 1]);
+
+  const stored = await db.select().from(listItems).where(eq(listItems.listId, list.id));
+  expect(stored.map(({ position, tmdbId }) => `${position}:${tmdbId}`).toSorted()).toEqual([
+    "0:5",
+    "1:4",
+    "2:3",
+    "3:2",
+    "4:1",
+  ]);
+
+  const [summary] = await alice.lists.overview();
+  expect(summary?.preview.map(({ tmdbId }) => tmdbId)).toEqual([5, 4, 3, 2]);
+
+  // A later addition still goes to the end, after the titles the user arranged.
+  await alice.lists.addItem({ listId: list.id, mediaType: "movie", tmdbId: 6 });
+  const appended = await alice.lists.get({ id: list.id });
+  expect(appended.items.map(({ tmdbId }) => tmdbId)).toEqual([5, 4, 3, 2, 1, 6]);
+});
+
+test("rejects reordering a foreign list or a stale item set", async () => {
+  const alice = rpc("lists-reorder-owner");
+  const bob = rpc("lists-reorder-other");
+  const list = await alice.lists.create({ name: "Alice's ranking" });
+  await alice.lists.addItem({ listId: list.id, mediaType: "movie", tmdbId: 11 });
+  await alice.lists.addItem({ listId: list.id, mediaType: "tv", tmdbId: 12 });
+  const { items } = await alice.lists.get({ id: list.id });
+  const [first, second] = items;
+  if (first === undefined || second === undefined) {
+    throw new Error("The list should hold two titles");
+  }
+
+  await expect(
+    bob.lists.reorder({ id: list.id, itemIds: [second.id, first.id] }),
+  ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+  const bobList = await bob.lists.create({ name: "Bob's ranking" });
+  await bob.lists.addItem({ listId: bobList.id, mediaType: "movie", tmdbId: 21 });
+  const bobListItems = await bob.lists.get({ id: bobList.id });
+  const [bobFirst] = bobListItems.items;
+  if (bobFirst === undefined) {
+    throw new Error("Bob's list should hold one title");
+  }
+
+  // Borrowing another list's item id must not move anything.
+  await expect(
+    bob.lists.reorder({ id: bobList.id, itemIds: [bobFirst.id, first.id] }),
+  ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  await expect(
+    alice.lists.reorder({ id: list.id, itemIds: [first.id, first.id, second.id] }),
+  ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  await expect(alice.lists.reorder({ id: list.id, itemIds: [first.id] })).rejects.toMatchObject({
+    code: "BAD_REQUEST",
+  });
+
+  const aliceAfter = await alice.lists.get({ id: list.id });
+  expect(aliceAfter.items.map(({ id }) => id)).toEqual([first.id, second.id]);
+  const bobAfter = await bob.lists.get({ id: bobList.id });
+  expect(bobAfter.items.map(({ id }) => id)).toEqual([bobFirst.id]);
 });
 
 test("marks which of a user's lists hold a title", async () => {

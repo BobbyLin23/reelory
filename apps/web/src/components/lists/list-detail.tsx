@@ -1,8 +1,13 @@
 import type { TmdbMediaSummary } from "@reelory/api/tmdb/schemas";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ListVideo, SearchX, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react";
 import { Link, useNavigate } from "react-router";
 
 import { Alert } from "@/components/arc/alert/alert";
@@ -37,6 +42,10 @@ interface TitleRef {
   tmdbId: number;
 }
 
+interface ListItemRef extends TitleRef {
+  id: string;
+}
+
 type TitleSummary = Extract<TmdbMediaSummary, { mediaType: "movie" | "tv" }>;
 
 const isTitle = (result: TmdbMediaSummary): result is TitleSummary => result.mediaType !== "person";
@@ -58,13 +67,26 @@ const titleMeta = (title: ListTitle | null | undefined, mediaType: MediaType, lo
   return `${title.year ?? translate(locale, "common.noYear")} · ${kindLabel(mediaType, locale)}`;
 };
 
+interface TitleDrag {
+  hintId: string;
+  onClickCapture: (event: ReactMouseEvent<HTMLAnchorElement>) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLSpanElement>) => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLAnchorElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLSpanElement>) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLSpanElement>) => void;
+  onPointerMove: (event: ReactPointerEvent<HTMLSpanElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLSpanElement>) => void;
+}
+
 const TitleCard = ({
+  drag,
   listName,
   onRemove,
   title,
   titleRef,
   removing,
 }: {
+  drag: TitleDrag;
   listName: string;
   onRemove: () => void;
   removing: boolean;
@@ -74,10 +96,25 @@ const TitleCard = ({
   const { locale, t } = useI18n();
   const poster = tmdbImageUrl(title?.posterPath ?? null, "w500");
   return (
-    <li className={styles.titleCard}>
-      <Link className={styles.titleLink} to={`/title/${titleRef.mediaType}/${titleRef.tmdbId}`}>
-        <span aria-hidden="true" className={styles.poster}>
-          {poster === null ? null : <img alt="" src={poster} />}
+    <>
+      <Link
+        aria-describedby={drag.hintId}
+        className={styles.titleLink}
+        draggable={false}
+        to={`/title/${titleRef.mediaType}/${titleRef.tmdbId}`}
+        onClickCapture={drag.onClickCapture}
+        onKeyDown={drag.onKeyDown}
+      >
+        <span
+          aria-hidden="true"
+          className={styles.poster}
+          onContextMenu={drag.onContextMenu}
+          onPointerCancel={drag.onPointerCancel}
+          onPointerDown={drag.onPointerDown}
+          onPointerMove={drag.onPointerMove}
+          onPointerUp={drag.onPointerUp}
+        >
+          {poster === null ? null : <img alt="" draggable={false} src={poster} />}
         </span>
         <span className={styles.titleCopy}>
           <span className={styles.cardTitle}>{titleName(title, locale)}</span>
@@ -98,7 +135,352 @@ const TitleCard = ({
       >
         <Trash2 aria-hidden="true" size={16} strokeWidth={1.75} />
       </Button>
-    </li>
+    </>
+  );
+};
+
+interface DragState {
+  from: number;
+  itemId: string;
+  over: number;
+  pointerId: number;
+  rects: DOMRect[];
+  startX: number;
+  startY: number;
+  x: number;
+  y: number;
+}
+
+interface PendingDrag {
+  index: number;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+/** A mouse has to move this far before the press becomes a drag instead of a click. */
+const DRAG_THRESHOLD_PX = 5;
+/** On touch, a still finger starts a reorder after this long; a moving finger scrolls. */
+const HOLD_TO_DRAG_MS = 250;
+const TOUCH_SCROLL_SLOP_PX = 8;
+/** A press that reordered the list still emits a click; ignore that click for a moment. */
+const CLICK_SUPPRESS_MS = 500;
+
+/** The card nearest the pointer, measured from the grid as it was when the drag began. */
+const nearestIndex = (rects: DOMRect[], x: number, y: number) => {
+  let nearest = 0;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const [index, rect] of rects.entries()) {
+    const dx = Math.max(rect.left - x, 0, x - rect.right);
+    const dy = Math.max(rect.top - y, 0, y - rect.bottom);
+    const distance = dx * dx + dy * dy;
+    if (distance < nearestDistance) {
+      nearest = index;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+};
+
+const moveId = (ids: string[], from: number, to: number): string[] | null => {
+  const moved = ids[from];
+  if (moved === undefined || from === to) {
+    return null;
+  }
+  const next = [...ids];
+  next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+};
+
+const TitleGrid = ({
+  items,
+  listName,
+  onRemove,
+  onReorder,
+  removingKey,
+  titles,
+}: {
+  items: ListItemRef[];
+  listName: string;
+  onRemove: (ref: TitleRef) => void;
+  onReorder: (itemIds: string[]) => void;
+  removingKey: string | null;
+  titles: Map<string, ListTitle | null>;
+}) => {
+  const { locale, t } = useI18n();
+  const grid = useRef<HTMLUListElement | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const pendingRef = useRef<PendingDrag | null>(null);
+  const suppressClickUntil = useRef(0);
+  const touchMoveGuard = useRef<((event: TouchEvent) => void) | null>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  const hintId = useId();
+  const ids = items.map((item) => item.id);
+
+  const setDragState = (next: DragState | null) => {
+    dragRef.current = next;
+    setDrag(next);
+  };
+
+  const clearPending = () => {
+    const current = pendingRef.current;
+    if (current !== null && current.timer !== null) {
+      clearTimeout(current.timer);
+    }
+    pendingRef.current = null;
+  };
+
+  const stopTouchGuard = () => {
+    if (touchMoveGuard.current !== null) {
+      document.removeEventListener("touchmove", touchMoveGuard.current);
+      touchMoveGuard.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      const current = pendingRef.current;
+      if (current !== null && current.timer !== null) {
+        clearTimeout(current.timer);
+      }
+      stopTouchGuard();
+    },
+    [],
+  );
+
+  const announceMove = (index: number, position: number) => {
+    const item = items[index];
+    if (item === undefined) {
+      return;
+    }
+    setAnnouncement(
+      t("lists.moved", {
+        count: items.length,
+        position,
+        title: titleName(titles.get(listTitleKey(item)), locale),
+      }),
+    );
+  };
+
+  const move = (from: number, to: number) => {
+    const next = moveId(ids, from, to);
+    if (next === null) {
+      return;
+    }
+    announceMove(from, to + 1);
+    onReorder(next);
+  };
+
+  const beginDrag = (index: number, pointerId: number, x: number, y: number, touch: boolean) => {
+    const item = items[index];
+    const cards = grid.current?.children;
+    if (item === undefined || cards === undefined) {
+      return;
+    }
+    const rects = Array.from(cards, (card) => card.getBoundingClientRect());
+    setDragState({
+      from: index,
+      itemId: item.id,
+      over: index,
+      pointerId,
+      rects,
+      startX: x,
+      startY: y,
+      x,
+      y,
+    });
+    if (touch) {
+      // The finger held still, so the page must not start scrolling under the drag.
+      const guard = (event: TouchEvent) => event.preventDefault();
+      touchMoveGuard.current = guard;
+      document.addEventListener("touchmove", guard, { passive: false });
+    }
+  };
+
+  const pointerDown = (event: ReactPointerEvent<HTMLSpanElement>, index: number) => {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+    if (pendingRef.current !== null || dragRef.current !== null) {
+      return;
+    }
+    const { pointerId } = event;
+    const pending: PendingDrag = {
+      index,
+      pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      timer: null,
+    };
+    if (event.pointerType === "mouse") {
+      try {
+        event.currentTarget.setPointerCapture(pointerId);
+      } catch {
+        // Without capture the drag still follows the pointer over the poster.
+      }
+      pendingRef.current = pending;
+      return;
+    }
+    pending.timer = setTimeout(() => {
+      const current = pendingRef.current;
+      if (current === null || current.pointerId !== pointerId) {
+        return;
+      }
+      pendingRef.current = null;
+      beginDrag(current.index, current.pointerId, current.startX, current.startY, true);
+    }, HOLD_TO_DRAG_MS);
+    pendingRef.current = pending;
+  };
+
+  const pointerMove = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const active = dragRef.current;
+    if (active !== null) {
+      if (active.pointerId !== event.pointerId) {
+        return;
+      }
+      setDragState({
+        ...active,
+        over: nearestIndex(active.rects, event.clientX, event.clientY),
+        x: event.clientX,
+        y: event.clientY,
+      });
+      return;
+    }
+    const waiting = pendingRef.current;
+    if (waiting === null || waiting.pointerId !== event.pointerId) {
+      return;
+    }
+    const distance = Math.hypot(event.clientX - waiting.startX, event.clientY - waiting.startY);
+    if (event.pointerType === "touch") {
+      // A finger that moves is scrolling the page; only a held finger reorders.
+      if (distance > TOUCH_SCROLL_SLOP_PX) {
+        clearPending();
+      }
+      return;
+    }
+    if (distance < DRAG_THRESHOLD_PX) {
+      return;
+    }
+    const { index, pointerId } = waiting;
+    clearPending();
+    beginDrag(index, pointerId, event.clientX, event.clientY, false);
+  };
+
+  const pointerUp = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const waiting = pendingRef.current;
+    if (waiting !== null && waiting.pointerId === event.pointerId) {
+      clearPending();
+    }
+    const active = dragRef.current;
+    if (active === null || active.pointerId !== event.pointerId) {
+      return;
+    }
+    setDragState(null);
+    stopTouchGuard();
+    suppressClickUntil.current = performance.now() + CLICK_SUPPRESS_MS;
+    move(active.from, active.over);
+  };
+
+  const pointerCancel = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const waiting = pendingRef.current;
+    if (waiting !== null && waiting.pointerId === event.pointerId) {
+      clearPending();
+    }
+    const active = dragRef.current;
+    if (active === null || active.pointerId !== event.pointerId) {
+      return;
+    }
+    setDragState(null);
+    stopTouchGuard();
+    suppressClickUntil.current = performance.now() + CLICK_SUPPRESS_MS;
+  };
+
+  const clickCapture = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (performance.now() >= suppressClickUntil.current) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    suppressClickUntil.current = 0;
+  };
+
+  const contextMenu = (event: ReactMouseEvent<HTMLSpanElement>) => {
+    if (dragRef.current !== null || performance.now() < suppressClickUntil.current) {
+      event.preventDefault();
+    }
+  };
+
+  // Arrow keys walk the reading order, so a keyboard user reorders without a pointer.
+  const reorderWithKeys = (event: ReactKeyboardEvent<HTMLAnchorElement>, index: number) => {
+    let step = 0;
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      step = -1;
+    } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      step = 1;
+    }
+    if (step === 0) {
+      return;
+    }
+    event.preventDefault();
+    move(index, Math.min(ids.length - 1, Math.max(0, index + step)));
+  };
+
+  return (
+    <>
+      <p className="sr-only" id={hintId}>
+        {t("lists.reorderHint")}
+      </p>
+      <output aria-live="polite" className="sr-only">
+        {announcement}
+      </output>
+      <ul
+        className={styles.titleGrid}
+        data-reordering={drag === null ? undefined : "true"}
+        ref={grid}
+      >
+        {items.map((titleRef, index) => {
+          const key = listTitleKey(titleRef);
+          const dragging = drag?.itemId === titleRef.id;
+          const target = drag !== null && drag.over === index && drag.over !== drag.from;
+          return (
+            <li
+              className={styles.titleCard}
+              data-dragging={dragging ? "true" : undefined}
+              data-target={target ? "true" : undefined}
+              key={titleRef.id}
+              style={
+                drag !== null && dragging
+                  ? {
+                      transform: `translate3d(${drag.x - drag.startX}px, ${drag.y - drag.startY}px, 0)`,
+                    }
+                  : undefined
+              }
+            >
+              <TitleCard
+                drag={{
+                  hintId,
+                  onClickCapture: clickCapture,
+                  onContextMenu: contextMenu,
+                  onKeyDown: (event) => reorderWithKeys(event, index),
+                  onPointerCancel: pointerCancel,
+                  onPointerDown: (event) => pointerDown(event, index),
+                  onPointerMove: pointerMove,
+                  onPointerUp: pointerUp,
+                }}
+                listName={listName}
+                removing={removingKey === key}
+                title={titles.get(key)}
+                titleRef={titleRef}
+                onRemove={() => onRemove(titleRef)}
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </>
   );
 };
 
@@ -278,12 +660,15 @@ export const ListDetail = ({ listId }: { listId: string }) => {
   const queryClient = useQueryClient();
   const [actionError, setActionError] = useState<string | null>(null);
   const listQuery = useQuery(orpc.lists.get.queryOptions({ input: { id: listId } }));
-  const items: TitleRef[] = listQuery.data?.items ?? [];
+  const items: ListItemRef[] = listQuery.data?.items ?? [];
   const titles = useListTitles(items);
   const renameList = useMutation(orpc.lists.rename.mutationOptions());
   const deleteList = useMutation(orpc.lists.delete.mutationOptions());
   const addItem = useMutation(orpc.lists.addItem.mutationOptions());
   const removeItem = useMutation(orpc.lists.removeItem.mutationOptions());
+  const reorderItems = useMutation(orpc.lists.reorder.mutationOptions());
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const queuedOrder = useRef<string[] | null>(null);
 
   const refresh = async () => {
     await Promise.all([
@@ -352,6 +737,39 @@ export const ListDetail = ({ listId }: { listId: string }) => {
     }
   };
 
+  // The new order shows at once. Saves run one after another and send only the
+  // latest order, so quick arrow presses cannot race or get dropped.
+  const reorderTitles = (itemIds: string[]) => {
+    const previous = listQuery.data;
+    if (previous === undefined) {
+      return;
+    }
+    setActionError(null);
+    const byId = new Map(previous.items.map((item) => [item.id, item]));
+    const ordered = itemIds.flatMap((id) => {
+      const item = byId.get(id);
+      return item === undefined ? [] : [item];
+    });
+    const { queryKey } = orpc.lists.get.queryOptions({ input: { id: listId } });
+    queryClient.setQueryData(queryKey, { ...previous, items: ordered });
+    queuedOrder.current = itemIds;
+    saveQueue.current = saveQueue.current.then(async () => {
+      const next = queuedOrder.current;
+      if (next === null) {
+        return;
+      }
+      queuedOrder.current = null;
+      try {
+        await reorderItems.mutateAsync({ id: listId, itemIds: next });
+      } catch {
+        setActionError(t("lists.reorderError"));
+      }
+      if (queuedOrder.current === null) {
+        await refresh();
+      }
+    });
+  };
+
   const confirmDelete = async () => {
     await deleteList.mutateAsync({ id: listId });
     // The deleted list must not refetch: its own get would answer NOT_FOUND.
@@ -415,6 +833,7 @@ export const ListDetail = ({ listId }: { listId: string }) => {
         <h2 className={styles.sectionHeading} id="list-titles-heading">
           {t("lists.titles")}
         </h2>
+        {items.length > 1 ? <p className={styles.note}>{t("lists.reorderNote")}</p> : null}
         {items.length === 0 ? (
           <EmptyState
             description={t("lists.emptyListDescription")}
@@ -422,23 +841,16 @@ export const ListDetail = ({ listId }: { listId: string }) => {
             title={t("lists.emptyListTitle")}
           />
         ) : (
-          <ul className={styles.titleGrid}>
-            {items.map((titleRef) => {
-              const key = listTitleKey(titleRef);
-              return (
-                <TitleCard
-                  key={key}
-                  listName={list.name}
-                  removing={removingKey === key}
-                  title={titles.get(key)}
-                  titleRef={titleRef}
-                  onRemove={() => {
-                    void removeTitle(titleRef);
-                  }}
-                />
-              );
-            })}
-          </ul>
+          <TitleGrid
+            items={items}
+            listName={list.name}
+            removingKey={removingKey}
+            titles={titles}
+            onRemove={(titleRef) => {
+              void removeTitle(titleRef);
+            }}
+            onReorder={reorderTitles}
+          />
         )}
       </section>
       {actionError === null ? null : (

@@ -216,4 +216,44 @@ export const listsRouter = {
       }
       return updated;
     }),
+
+  // The client sends the whole list back in its new order, so one write decides
+  // every position. A list that changed in another tab fails instead of applying
+  // a partial order to items the caller never saw.
+  reorder: protectedProcedure
+    .input(z.object({ id: listId, itemIds: z.array(z.uuid()).min(1) }))
+    .handler(async ({ context, input }) => {
+      const list = await requireOwnedList(context.db, context.auth.userId, input.id);
+      const current = await context.db
+        .select({ id: listItems.id })
+        .from(listItems)
+        .where(eq(listItems.listId, list.id));
+      const currentIds = new Set(current.map((row) => row.id));
+      const givenIds = new Set(input.itemIds);
+      const matchesList =
+        givenIds.size === input.itemIds.length &&
+        givenIds.size === currentIds.size &&
+        [...givenIds].every((id) => currentIds.has(id));
+      if (!matchesList) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "The list changed. Reload it and try again.",
+        });
+      }
+
+      const [firstId, ...restIds] = input.itemIds;
+      if (firstId === undefined) {
+        throw new ORPCError("BAD_REQUEST", { message: "Choose an order for this list." });
+      }
+      const positionOf = (itemId: string, position: number) =>
+        context.db
+          .update(listItems)
+          .set({ position })
+          .where(and(eq(listItems.id, itemId), eq(listItems.listId, list.id)));
+      await context.db.batch([
+        positionOf(firstId, 0),
+        ...restIds.map((itemId, index) => positionOf(itemId, index + 1)),
+      ]);
+
+      return { reordered: input.itemIds.length };
+    }),
 };
