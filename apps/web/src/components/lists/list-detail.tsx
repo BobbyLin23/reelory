@@ -1,6 +1,6 @@
 import type { TmdbMediaSummary } from "@reelory/api/tmdb/schemas";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ListVideo, SearchX, Trash2, X } from "lucide-react";
+import { ArrowLeft, ListVideo, SearchX, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
@@ -96,8 +96,7 @@ const TitleCard = ({
         variant="ghost"
         onClick={onRemove}
       >
-        <X aria-hidden="true" size={14} strokeWidth={2} />
-        {t("common.remove")}
+        <Trash2 aria-hidden="true" size={16} strokeWidth={1.75} />
       </Button>
     </li>
   );

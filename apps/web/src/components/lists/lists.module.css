@@ -152,6 +152,7 @@
 }
 
 .titleCard {
+  position: relative;
   display: grid;
   align-content: start;
   min-width: 0;
@@ -194,8 +195,24 @@
   white-space: nowrap;
 }
 
-.removeButton {
-  justify-self: start;
+/* Removal is a quiet translucent grey corner control: flush to the poster's top and right, shaped to its rounded corner. */
+.titleCard .removeButton {
+  --remove-tint: color-mix(in oklab, var(--foreground) 14%, var(--background));
+  --remove-surface: color-mix(in oklab, var(--remove-tint) 55%, transparent);
+
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-radius: 0 var(--radius-control) 0 var(--radius-control);
+  background: var(--remove-surface);
+  color: var(--foreground);
+}
+
+/* Hover and press keep the same grey and ink, so the control never repaints under the pointer. */
+.titleCard .removeButton:hover:not(:disabled),
+.titleCard .removeButton:active:not(:disabled) {
+  background: var(--remove-surface);
+  color: var(--foreground);
 }
 
 .searchResults {
@@ -291,6 +308,18 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .removeButton {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-fast) var(--ease-standard);
+  }
+
+  .titleCard:hover .removeButton,
+  .titleCard:focus-within .removeButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .listCard:hover .listCardName,
   .titleLink:hover .cardTitle {
     text-decoration: underline;
@@ -299,5 +328,11 @@
 
   .backLink:hover {
     color: var(--foreground);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .removeButton {
+    transition: none;
   }
 }
