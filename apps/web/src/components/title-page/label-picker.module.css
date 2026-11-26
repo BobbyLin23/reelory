@@ -1,0 +1,164 @@
+.field {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.label {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: var(--leading-body);
+}
+
+/* The suggestion list floats over the fields below, so opening it never moves the form's actions. */
+.anchor {
+  position: relative;
+  min-width: 0;
+}
+
+/* The chips and the text field share one border, so the field grows with the selection like a regular input. */
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--control-height-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface);
+  transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+.control:focus-within,
+.control[data-open] {
+  border-color: var(--foreground);
+}
+
+.chips {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 0.125rem var(--space-2) 0.125rem var(--space-3);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+}
+
+.remove {
+  display: grid;
+  border: 0;
+  border-radius: 999px;
+  padding: 2px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  place-items: center;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .remove:hover {
+    background: var(--surface-raised);
+    color: var(--foreground);
+  }
+}
+
+.input {
+  flex: 1 1 6rem;
+  min-width: 6rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-field);
+  line-height: var(--leading-body);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+/* Positioned within the field, so it moves with it while the dialog scrolls and never clips the layout. */
+.panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  display: grid;
+  max-height: 14rem;
+  margin: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: var(--space-1);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+/* Without room below, the list rises above the field so the form's actions stay clear. */
+.panel[data-side="top"] {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.option {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+  min-height: var(--control-height-sm);
+  border: 0;
+  border-radius: calc(var(--radius-panel) - 5px);
+  padding: 0 var(--space-2);
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.option[data-active] {
+  background: var(--surface-muted);
+}
+
+.optionText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.description {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}

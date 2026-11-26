@@ -320,7 +320,6 @@ export const TitlePage = ({ mediaType, tmdbId }: TitlePageProps) => {
         mediaType={mediaType}
         open={page.logOpen}
         seasons={page.seasons}
-        title={page.title}
         tmdbId={tmdbId}
         onSaved={page.handleLogged}
         onOpenChange={(open) => {

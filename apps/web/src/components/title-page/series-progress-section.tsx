@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { Button } from "@/components/arc/button/button";
-import { DatePicker } from "@/components/arc/date-picker/date-picker";
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
 import { useToday } from "@/components/arc/lib/use-today";
 import { Select } from "@/components/arc/select/select";
@@ -25,6 +24,7 @@ import {
 import { orpc } from "@/utils/orpc";
 
 import type { WatchLog } from "./title-sections";
+import { WatchDateField } from "./watch-date-field";
 
 import styles from "./title-page.module.css";
 
@@ -157,22 +157,10 @@ const MarkThroughForm = ({
         value={episode}
         onValueChange={setEpisode}
       />
-      <DatePicker
+      <WatchDateField
         description={t("series.dateDescription")}
         label={t("log.dateLabel")}
-        labels={{
-          calendar: t("arc.date.calendar"),
-          chooseDay: t("arc.date.chooseDay"),
-          clear: t("common.clear"),
-          nextMonth: t("arc.calendar.nextMonth"),
-          previousMonth: t("arc.calendar.previousMonth"),
-          selected: t("arc.date.selected"),
-          today: t("arc.calendar.today"),
-          todayFull: t("arc.calendar.todayFull"),
-        }}
-        locale={locale}
         placeholder={t("log.datePlaceholder")}
-        showToday
         value={resolvedDate === null ? undefined : fromIsoDate(resolvedDate)}
         onChange={(date) => setWatchedOn(date === undefined ? null : toIsoDate(date))}
       />

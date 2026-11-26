@@ -63,6 +63,25 @@ export const watchRouter = {
       .orderBy(desc(watchEntries.watchedOn), desc(watchEntries.createdAt), desc(watchEntries.id)),
   ),
 
+  // Labels are private per watch, so the form offers the ones this user already
+  // used, most used first, instead of a shared vocabulary.
+  tags: protectedProcedure.handler(async ({ context }) => {
+    const rows = await context.db
+      .select({ tags: watchEntries.tags })
+      .from(watchEntries)
+      .where(eq(watchEntries.userId, context.auth.userId));
+    const counts = new Map<string, number>();
+    for (const { tags } of rows) {
+      for (const tag of new Set(tags)) {
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort(([a, countA], [b, countB]) => countB - countA || a.localeCompare(b))
+      .slice(0, 100)
+      .map(([tag]) => tag);
+  }),
+
   log: protectedProcedure
     .input(
       titleKey

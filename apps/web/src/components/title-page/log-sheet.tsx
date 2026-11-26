@@ -4,9 +4,7 @@ import { useId, useState, useSyncExternalStore } from "react";
 
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
-import { DatePicker } from "@/components/arc/date-picker/date-picker";
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
-import { Input } from "@/components/arc/input/input";
 import { useToday } from "@/components/arc/lib/use-today";
 import { Rating } from "@/components/arc/rating/rating";
 import { Select } from "@/components/arc/select/select";
@@ -23,6 +21,9 @@ import {
   viewingMethodLabel,
 } from "@/utils/media";
 import { orpc } from "@/utils/orpc";
+
+import { LabelPicker } from "./label-picker";
+import { WatchDateField } from "./watch-date-field";
 
 import styles from "./title-page.module.css";
 
@@ -43,7 +44,6 @@ interface LogSheetProps {
   mediaType: "movie" | "tv";
   open: boolean;
   seasons: TmdbTvDetail["seasons"];
-  title: string;
   tmdbId: number;
   onOpenChange: (open: boolean) => void;
   onSaved: (watch: { season: number | null }) => Promise<unknown>;
@@ -57,17 +57,6 @@ const subscribeCompact = (change: () => void) => {
   query.addEventListener("change", change);
   return () => query.removeEventListener("change", change);
 };
-
-/** Comma, fullwidth comma, and ideographic comma all separate tags. */
-const parseTags = (value: string): string[] =>
-  [
-    ...new Set(
-      value
-        .split(/[,，、]/u)
-        .map((tag) => tag.trim().slice(0, 50))
-        .filter(Boolean),
-    ),
-  ].slice(0, 20);
 
 const episodeOptions = (
   season: TmdbSeasonDetail | undefined,
@@ -93,7 +82,7 @@ const LogForm = ({
   onSaved,
   seasons,
   tmdbId,
-}: Omit<LogSheetProps, "formKey" | "open" | "title">) => {
+}: Omit<LogSheetProps, "formKey" | "open">) => {
   const { locale, t } = useI18n();
   const today = useToday();
   const errorId = useId();
@@ -101,7 +90,7 @@ const LogForm = ({
   const isTv = mediaType === "tv";
   const [stars, setStars] = useState(() => ratingToStars(entry?.rating ?? null));
   const [review, setReview] = useState(() => entry?.review ?? "");
-  const [tags, setTags] = useState(() => entry?.tags.join(", ") ?? "");
+  const [tags, setTags] = useState<string[]>(() => entry?.tags ?? []);
   const [viewingMethod, setViewingMethod] = useState(() => entry?.viewingMethod ?? none);
   const [season, setSeason] = useState(() =>
     entry?.season === null || entry?.season === undefined ? none : String(entry.season),
@@ -116,6 +105,7 @@ const LogForm = ({
   const todayDate = today === undefined ? null : toIsoDate(today);
   const resolvedDate = watchedOn === undefined ? todayDate : watchedOn;
   const seasonNumber = season === none ? null : Number(season);
+  const labelQuery = useQuery(orpc.watch.tags.queryOptions());
   const seasonQuery = useQuery(
     orpc.tmdb.tv.season.queryOptions({
       enabled: isTv && seasonNumber !== null,
@@ -145,7 +135,7 @@ const LogForm = ({
       rating: starsToRating(stars),
       review: review.trim() === "" ? null : review.trim(),
       season: season === none ? null : Number(season),
-      tags: parseTags(tags),
+      tags,
       viewingMethod: viewingMethod === none ? null : (viewingMethod as ViewingMethod),
       watchedOn: resolvedDate,
     };
@@ -157,6 +147,7 @@ const LogForm = ({
         queryClient.invalidateQueries({ queryKey: orpc.library.list.key() }),
         queryClient.invalidateQueries({ queryKey: orpc.library.overview.key() }),
         queryClient.invalidateQueries({ queryKey: orpc.watch.list.key() }),
+        queryClient.invalidateQueries({ queryKey: orpc.watch.tags.key() }),
       ]);
       await onSaved(saved);
       onOpenChange(false);
@@ -174,22 +165,9 @@ const LogForm = ({
         void save();
       }}
     >
-      <DatePicker
-        description={t("log.dateDescription")}
+      <WatchDateField
         label={t("log.dateLabel")}
-        labels={{
-          calendar: t("arc.date.calendar"),
-          chooseDay: t("arc.date.chooseDay"),
-          clear: t("common.clear"),
-          nextMonth: t("arc.calendar.nextMonth"),
-          previousMonth: t("arc.calendar.previousMonth"),
-          selected: t("arc.date.selected"),
-          today: t("arc.calendar.today"),
-          todayFull: t("arc.calendar.todayFull"),
-        }}
-        locale={locale}
         placeholder={t("log.datePlaceholder")}
-        showToday
         value={resolvedDate === null ? undefined : fromIsoDate(resolvedDate)}
         onChange={(date) => setWatchedOn(date === undefined ? null : toIsoDate(date))}
       />
@@ -218,12 +196,13 @@ const LogForm = ({
         value={review}
         onChange={(event) => setReview(event.target.value)}
       />
-      <Input
+      <LabelPicker
         description={t("log.tagsDescription")}
         label={t("log.tagsLabel")}
+        options={labelQuery.data ?? []}
         placeholder={t("log.tagsPlaceholder")}
         value={tags}
-        onChange={(event) => setTags(event.target.value)}
+        onChange={setTags}
       />
       {isTv ? (
         <div className={styles.pair}>
@@ -276,7 +255,6 @@ export const LogSheet = ({
   onSaved,
   open,
   seasons,
-  title,
   tmdbId,
 }: LogSheetProps) => {
   const { t } = useI18n();
@@ -301,7 +279,6 @@ export const LogSheet = ({
     return (
       <BottomSheet
         closeLabel={t("arc.dialog.close")}
-        description={t("log.description", { title })}
         detents={[0.94]}
         open={open}
         title={entry === null ? t("log.titleNew") : t("log.titleEdit")}
@@ -315,8 +292,8 @@ export const LogSheet = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        aria-describedby={undefined}
         closeLabel={t("arc.dialog.close")}
-        description={t("log.description", { title })}
         title={entry === null ? t("log.titleNew") : t("log.titleEdit")}
       >
         {open ? form : null}

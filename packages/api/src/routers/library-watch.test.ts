@@ -73,6 +73,7 @@ test("rejects unauthenticated requests to every new procedure", async () => {
     anonymous.library.removeWant(tv),
     anonymous.library.setStatus({ ...tv, snapshot, status: "watching" }),
     anonymous.watch.list(tv),
+    anonymous.watch.tags(),
     anonymous.watch.log(tv),
     anonymous.watch.markThrough({ ...tv, episodes: [{ episode: 1, season: 1 }] }),
     anonymous.watch.update({ id, review: "Private" }),
@@ -282,6 +283,27 @@ test("logs rewatches independently and lets only the owner edit or delete a watc
     watchedOn: null,
   });
   expect(await alice.library.list()).toEqual([libraryEntry]);
+});
+
+test("lists the user's own labels once each, most used first", async () => {
+  const alice = rpc("labels-alice");
+  const bob = rpc("labels-bob");
+  const first = { mediaType: "movie", tmdbId: 301 } as const;
+  const second = { mediaType: "tv", tmdbId: 302 } as const;
+
+  await alice.watch.log({ ...first, tags: ["IMAX", "rewatch", "IMAX"] });
+  await alice.watch.log({ ...first, tags: ["rewatch"] });
+  await alice.watch.log({ ...second, tags: ["cozy"] });
+  await bob.watch.log({ ...first, tags: ["bob only"] });
+
+  // Most used first, then alphabetical, and never another user's labels.
+  expect(await alice.watch.tags()).toEqual(["rewatch", "cozy", "IMAX"]);
+  expect(await bob.watch.tags()).toEqual(["bob only"]);
+
+  // Removing the last watch that carried a label drops it from the list.
+  const watches = await alice.watch.list(second);
+  await alice.watch.delete({ id: watches[0]!.id });
+  expect(await alice.watch.tags()).toEqual(["rewatch", "IMAX"]);
 });
 
 test("marks every missing episode through a target in one request", async () => {

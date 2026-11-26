@@ -360,23 +360,6 @@
   margin-top: auto;
 }
 
-/* The dialog body scrolls, so an anchored calendar is cut off at the card edge; in the form flow it keeps its footer and sits clear of the actions. The date calendar is the form's only nested dialog. */
-.form [role="dialog"] {
-  position: static;
-  width: 100%;
-  margin-top: 8px;
-  border: 0;
-  padding: 0;
-  overflow: visible;
-  background: transparent;
-  box-shadow: none;
-}
-
-/* The calendar caps itself at 328px, which leaves dead space under a wider field; in this dialog it spans the field like the trigger. */
-.form [role="dialog"] > section {
-  width: 100%;
-}
-
 .pair {
   display: grid;
   grid-template-columns: 1fr;
